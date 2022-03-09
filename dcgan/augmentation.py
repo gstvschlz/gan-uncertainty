@@ -10,16 +10,21 @@ import cv2
 import numpy as np
 from tqdm import tqdm
 
-original_images_path_list = os.listdir("dataset/training_images/")
-os.makedirs("dataset/generated_images/", exist_ok=True)
+transform = A.Compose([
+    A.GaussianBlur(p=0.6),
+    A.ShiftScaleRotate(p=0.5),
+    A.GaussNoise(p=0.5),
+    A.Cutout(num_holes=10, max_h_size=64, max_w_size=64),
+    A.GaussNoise(p=0.5),
+])
 
 
-def resize_linear(image_matrix, new_height:int, new_width:int):
+def resize_linear(image_matrix, new_height: int, new_width: int):
     """Perform a pure-numpy linear-resampled resize of an image."""
     output_image = np.zeros((new_height, new_width), dtype=image_matrix.dtype)
     original_height, original_width = image_matrix.shape
-    inv_scale_factor_y = original_height/new_height
-    inv_scale_factor_x = original_width/new_width
+    inv_scale_factor_y = original_height / new_height
+    inv_scale_factor_x = original_width / new_width
 
     # This is an ugly serial operation.
     for new_y in range(new_height):
@@ -35,7 +40,8 @@ def resize_linear(image_matrix, new_height:int, new_width:int):
             left_upper = image_matrix[math.floor(old_y), math.floor(old_x)]
             right_upper = image_matrix[math.floor(old_y), min(image_matrix.shape[1] - 1, math.ceil(old_x))]
             left_lower = image_matrix[min(image_matrix.shape[0] - 1, math.ceil(old_y)), math.floor(old_x)]
-            right_lower = image_matrix[min(image_matrix.shape[0] - 1, math.ceil(old_y)), min(image_matrix.shape[1] - 1, math.ceil(old_x))]
+            right_lower = image_matrix[
+                min(image_matrix.shape[0] - 1, math.ceil(old_y)), min(image_matrix.shape[1] - 1, math.ceil(old_x))]
 
             # Interpolate horizontally:
             blend_top = (right_upper * x_fraction) + (left_upper * (1.0 - x_fraction))
@@ -70,54 +76,32 @@ def sp_noise(image, prob):
     return output
 
 
-transform = A.Compose([
-    A.RandomRotate90(),
-    A.Flip(),
-    A.Transpose(),
-    A.OneOf([
-        A.GaussianBlur(),
-        A.GaussNoise(),
-    ], p=0.3),
-    A.OneOf([
-        A.MotionBlur(p=.2),
-        A.MedianBlur(blur_limit=3, p=0.1),
-        A.Blur(blur_limit=3, p=0.1),
-    ], p=0.6),
-    A.ShiftScaleRotate(shift_limit=0.0625, scale_limit=0.2, rotate_limit=45, p=0.2),
-    A.OneOf([
-        A.OpticalDistortion(p=0.3),
-        A.GridDistortion(p=.1),
-        A.PiecewiseAffine(p=0.3),
-    ], p=0.5),
-    A.OneOf([
-        A.CLAHE(clip_limit=2),
-        A.Sharpen(),
-        A.Emboss(),
-        A.RandomBrightnessContrast(),
-    ], p=0.4),
-    A.HueSaturationValue(p=0.4),
-])
+class DatasetAugmenter:
+    def __init__(self, images_dir: str, output_dir: str):
+        self.original_images_path_list = os.listdir(images_dir)
+        self.images_dir = images_dir
+        self.output_dir = output_dir
+        os.makedirs(output_dir, exist_ok=True)
 
-ignore_list = []
+    def run(self):
+        for image_name in tqdm(self.original_images_path_list):
+            try:
+                image = cv2.imread(f"{self.images_dir}/{image_name}", 0)
 
-for image_name in tqdm(original_images_path_list):
-    if image_name not in ignore_list:
-        try:
-            image = cv2.imread(f"dataset/training_images/{image_name}", 0)
+                noise_threshold = random.choice([0.1, 0.3])
+                noise_image = sp_noise(image, noise_threshold)
 
-            noise_threshold = random.choice([0.1, 0.3])
-            noise_image = sp_noise(image, noise_threshold)
+                print(f"Reading and augmenting image: {image_name}")
+                image_resized = resize_linear(noise_image, new_height=64, new_width=64)
+                cv2.imwrite(f"{self.output_dir}/noise_image_{image_name.replace('.png', '')}.png", image_resized)
 
-            print(f"Reading and augmenting image: {image_name}")
-            image_resized = resize_linear(noise_image, new_height=64, new_width=64)
-            cv2.imwrite(f"dataset/generated_images/noise_image_{image_name.replace('.png', '')}.png", image_resized)
-            # Applying augmentation
-            for i in tqdm(range(50)):
-                augmented_image = transform(image=image)['image']
-                image_resized = resize_linear(augmented_image, new_height=64, new_width=64)
-                cv2.imwrite(f"dataset/generated_images/augmented_{image_name.replace('.png', '')}_{i}.png", image_resized)
+                # Applying augmentation
+                for i in range(500):
+                    augmented_image = transform(image=image)['image']
+                    image_resized = resize_linear(augmented_image, new_height=64, new_width=64)
+                    cv2.imwrite(f"{self.output_dir}/augmented_{image_name.replace('.png', '')}_{i}.png",
+                                image_resized)
 
-        except AttributeError or cv2.error as e:
-            print(f"Image {image_name} error: {e.args}.")
-            pass
-
+            except AttributeError as e:
+                print(f"Image {image_name} error: {e.args}.")
+                pass
