@@ -21,7 +21,7 @@ class GeneratorModel(nn.Module):
     Critic.
     """
 
-    def __init__(self, dim_in, dim: int = 64):
+    def __init__(self, dim_in, dim: int = 128):
         super(GeneratorModel, self).__init__()
 
         def genblock(input_dim, dim_out):
@@ -53,10 +53,16 @@ class GeneratorModel(nn.Module):
                                      nn.BatchNorm1d(dim * 8 * 4 * 4),
                                      nn.ReLU())
 
-        self.generate = nn.Sequential(genblock(dim * 8, dim * 4),
+        #self.generate = nn.Sequential(genblock(dim * 8, dim * 4),
+        #                              genblock(dim * 4, dim * 2),
+        #                              genimg(dim * 2, dim),
+        #                              genimg(dim))
+        
+        self.generate = nn.Sequential(genblock(dim * 8, dim * 16),
+                                      genblock(dim * 16, dim * 8),
+                                      genblock(dim * 8, dim * 4),
                                       genblock(dim * 4, dim * 2),
-                                      genblock(dim * 2, dim),
-                                      genimg(dim))
+                                      genimg(dim * 2))
 
     def forward(self, x):
         """Forward pass function."""
@@ -77,7 +83,7 @@ class CriticModel(nn.Module):
     generated data.
     """
 
-    def __init__(self, dim_in, dim=64):
+    def __init__(self, dim_in, dim=128):
         super(CriticModel, self).__init__()
 
         def critic_block(input_dim, dim_out):

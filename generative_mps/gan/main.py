@@ -1,4 +1,5 @@
 import os
+from random import random
 import shutil
 import time
 
@@ -17,23 +18,22 @@ from torch.autograd import Variable, grad
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from generative_mps.gan.core.wgan_gp import CriticModel, GeneratorModel
+from core.wgan_gp import CriticModel, GeneratorModel
 
 DEVICE = torch.device("cuda:0")
 
 
 def gradient_penalty(x, y, f):
     shape = [x.size(0)] + [1] * (x.dim() - 1)
-    alpha = torch.rand(shape).cuda()
-    # alpha = torch.rand(shape)
+    #alpha = torch.rand(shape).to(DEVICE, non_blocking=True)
+    alpha = torch.rand(shape)
     z = x + alpha * (y - x)
     z = Variable(z, requires_grad=True)
-    z = z.cuda()
+    #z = z.to(DEVICE, non_blocking=True)
     o = f(z)
-    g = grad(o, z, grad_outputs=torch.ones(o.size()).cuda(),
-             create_graph=True)[0].view(z.size(0), -1)
-    # g = grad(o,z, grad_outputs=torch.ones(o.size()), create_graph=True)[
-    # 0].view(z.size(0), -1)
+    #g = grad(o, z, grad_outputs=torch.ones(o.size()).to(DEVICE, non_blocking=True),
+    #         create_graph=True)[0].view(z.size(0), -1)
+    g = grad(o,z, grad_outputs=torch.ones(o.size()), create_graph=True)[0].view(z.size(0), -1)
     gp = ((g.norm(p=2, dim=1)) ** 2).mean()
     return gp
 
@@ -84,7 +84,7 @@ def load_checkpoint(ckpt_dir_or_file, map_location=None, load_best=False):
 
 
 def config():
-    with open("generative_mps/data/parameters.yaml", 'r') as stream:
+    with open(r"C:\Users\algocompretto\PycharmProjects\gan-for-mps\generative_mps\data\parameters.yaml", 'r') as stream:
         try:
             parsed_yaml = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
@@ -115,7 +115,7 @@ def generate_windows(args_dict: dict):
 
     _, ti = cv2.threshold(ti32, 127, 255, cv2.THRESH_BINARY)
 
-    patch_array = view_as_windows(ti, (128, 128))
+    patch_array = view_as_windows(ti, (150, 150))
     return patch_array
 
 
@@ -136,19 +136,11 @@ def save_generated_images(windowed_images, args_dict: dict) -> None:
                             ncols=100):
         for j, t in enumerate(batch_ti):
             ti_resized = cv2.resize(t, (128, 128))
-            imsave(f"{args_dict['output_dir']}/strebelle_{i}_{j}.png",
-                   ti_resized)
-
-
-def generate_trivial_augment(args_dict: dict) -> None:
-    ti32 = cv2.imread(args_dict["training_image"])
-    _, ti = cv2.threshold(ti32, 127, 255, cv2.THRESH_BINARY)
-
-    augmenter = transforms.TrivialAugmentWide()
-    images = [augmenter(Image.fromarray(np.uint8(ti))) for _ in range(3_000)]
-
-    for idx, ti in tqdm(enumerate(images)):
-        imsave(f"{args_dict['output_dir']}/strebelle_{idx}.png", np.array(ti))
+            imsave(f"{args_dict['output_dir']}/strebelle_{i}_{j}_{time.time()}.png", ti_resized)
+            #list_of_transf = [transforms.RandomVerticalFlip(),
+            #                transforms.RandomHorizontalFlip()]
+            #for flip in list_of_transf:
+            #    im = flip(ti_resized)
 
 
 if __name__ == "__main__":
@@ -247,15 +239,14 @@ def train(args_dict) -> None:
     args_dict : argparse.args
         Parameters defined for model training.
     """
-    critic = CriticModel(args_dict["num_channels"]).cuda()
-    generator = GeneratorModel(args_dict["latent_dim"]).cuda()
-    # Critic = CriticModel(args["num_channels"])
-    # Generator = GeneratorModel(args["latent_dim"])
+    #critic = CriticModel(args_dict["num_channels"]).to(DEVICE, non_blocking=True)
+    #generator = GeneratorModel(args_dict["latent_dim"]).to(DEVICE, non_blocking=True)
+    critic = CriticModel(args["num_channels"])
+    generator = GeneratorModel(args["latent_dim"])
 
     # Instantiates optimizers
     G_opt = torch.optim.Adam(
-        generator.parameters(), lr=args_dict["learning_rate"],
-        betas=(0.5, 0.999))
+        generator.parameters(), lr=args_dict["learning_rate"], betas=(0.5, 0.999))
 
     C_opt = torch.optim.Adam(
         critic.parameters(), lr=args_dict["learning_rate"], betas=(0.5, 0.999))
@@ -275,7 +266,8 @@ def train(args_dict) -> None:
     data = torchvision.datasets.ImageFolder(
         args_dict["images_path"], transform=transformation_funcs)
     dataloader = DataLoader(data, batch_size=args_dict["batch_size"],
-                            shuffle=True, num_workers=args_dict["num_workers"])
+                            shuffle=True, num_workers=args_dict["num_workers"],
+                            pin_memory=True)
 
     # Starting training loop
     for epoch in tqdm(range(start_epoch, args_dict["n_epochs"]),
@@ -294,13 +286,13 @@ def train(args_dict) -> None:
             batch = images.size(0)
 
             if args_dict["cuda"]:
-                images = images.cuda()
+                images = images.to(DEVICE, non_blocking=True)
 
             # Creates random noise
             z = Variable(torch.randn(batch, args_dict["latent_dim"]))
 
             if args_dict["cuda"]:
-                z = z.cuda()
+                z = z.to(DEVICE, non_blocking=True)
 
             # Sends random noise to Generator and gets Critic output
             generated = generator(z)
@@ -335,7 +327,7 @@ def train(args_dict) -> None:
                 z = Variable(torch.randn(batch, args_dict["latent_dim"]))
 
                 if args_dict["cuda"]:
-                    z = z.cuda()
+                    z = z.to(DEVICE, non_blocking=True)
 
                 # Generate new images from this latent vector
                 generated = generator(z)
@@ -368,7 +360,7 @@ def train(args_dict) -> None:
         # Generate new samples to save
         z_sample = Variable(torch.randn(100, args_dict["latent_dim"]))
         if args_dict["cuda"]:
-            z_sample = z_sample.cuda()
+            z_sample = z_sample.to(DEVICE, non_blocking=True)
 
         fake_gen_images = (generator(z_sample).data + 1) / 2.0
 

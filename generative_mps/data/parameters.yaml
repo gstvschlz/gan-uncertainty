@@ -1,5 +1,5 @@
 output_dir: windowed_ti/real
-training_image: strebelle.png
+training_image: C:\\Users\\algocompretto\\PycharmProjects\\gan-for-mps\\generative_mps\\data\\TI\\strebelle.png
 checkpoint: .checkpoints/
 sample_images: output/wgan
 
@@ -11,5 +11,5 @@ batch_size: 64
 num_workers: 8
 
 n_epochs: 100
-cuda: True
+cuda: False
 n_critic: 5
