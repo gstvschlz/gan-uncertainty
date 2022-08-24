@@ -2,7 +2,7 @@
                   ********************
 
 START OF PARAMETERS:
-samples50.out                 - file with original data
+samples50                 - file with original data
 1  2  3  4                    - columns for x, y, z, variable
 2                             - number of categories
 0   1                     	  - category codes

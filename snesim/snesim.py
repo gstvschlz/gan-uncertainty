@@ -16,7 +16,8 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 
 def get_args():
     parser = argparse.ArgumentParser(description='Perform easy SNESIM simulations with this CLI!')
-
+  || teste de tabela ||
+  || alo ||
     parser.add_argument('--samples_path', default="data/samples50",
                         type=str, help='Samples path')
 
@@ -30,9 +31,9 @@ def get_args():
                         type=str, help='SNESIM executable path')
 
     parser.add_argument('--output_path', default="data/snesim.out",
-                        type=str, help='Training image path')
+                        type=str, help='Output path')
 
-    parser.add_argument('--realizations', default=10,
+    parser.add_argument('--realizations', default=50,
                         type=int, help='Number of realizations to simulate')
 
     parser.add_argument('--max_cond', default=30,
@@ -73,8 +74,8 @@ snesim.dbg{" "*30}- debugging file
 {arguments.seed}              - random number seed
 {arguments.max_cond}          - max number of conditioning primary data
 {arguments.min_cond}          - min. replicates number
-0	0{" "*30}     - condition to LP (0=no, 1=yes), flag for iauto
-1.0	1.0{" "*30}   - two weighting factors to combine P(A|B) and P(A|C)
+0   0{" "*30}     - condition to LP (0=no, 1=yes), flag for iauto
+1.0 1.0{" "*30}   - two weighting factors to combine P(A|B) and P(A|C)
 localprop.dat                 - file for local proportions
 0{" "*30}         - condition to rotation and affinity (0=no, 1=yes)
 rotangle.dat                  - file for rotation and affinity
@@ -162,11 +163,6 @@ def read_conditional_samples(filename: object = 'eas.dat', nanval: object = -997
 
     return eas
 
-def highlight_cell(x_coordinate, y_coordinate, axis=None, **kwargs):
-    rect = plt.Rectangle((x_coordinate - .5, y_coordinate - .5), 1, 1, fill=True, **kwargs)
-    axis = axis or plt.gca()
-    axis.add_patch(rect)
-    return rect
 
 def get_color_bar():
     cmap = mpl.colors.ListedColormap(['white', "black"])

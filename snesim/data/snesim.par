@@ -13,15 +13,15 @@ vertprop.dat                  - file with target vertical proportions
 -1                                      - debugging level: 0,1,2,3
 snesim.dbg                              - debugging file
 data/snesim.out                                     - file for simulation output
-10                                    - number of realizations to generate
+50                                    - number of realizations to generate
 150    0.5    1.0             - nx,xmn,xsiz
 150    0.5    1.0             - ny,ymn,ysiz
 1     0.5    1.0              - nz,zmn,zsiz
 69069              - random number seed
 30          - max number of conditioning primary data
 10          - min. replicates number
-0	0                                   - condition to LP (0=no, 1=yes), flag for iauto
-1.0	1.0                                 - two weighting factors to combine P(A|B) and P(A|C)
+0   0                                   - condition to LP (0=no, 1=yes), flag for iauto
+1.0 1.0                                 - two weighting factors to combine P(A|B) and P(A|C)
 localprop.dat                 - file for local proportions
 0                                       - condition to rotation and affinity (0=no, 1=yes)
 rotangle.dat                  - file for rotation and affinity

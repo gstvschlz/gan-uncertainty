@@ -1,105 +1,113 @@
-argon2-cffi==21.3.0
-argon2-cffi-bindings==21.2.0
-asttokens==2.0.8
-attrs==22.1.0
-backcall==0.2.0
-beautifulsoup4==4.11.1
-bleach==5.0.1
-certifi==2022.6.15
-cffi==1.15.1
-charset-normalizer==2.1.0
-cycler==0.11.0
-debugpy==1.6.2
-decorator==5.1.1
-defusedxml==0.7.1
-entrypoints==0.4
-executing==0.10.0
-fastjsonschema==2.16.1
-fonttools==4.35.0
-h5py==3.7.0
-idna==3.3
-iniconfig==1.1.1
-ipykernel==6.15.1
-ipython==8.4.0
-ipython-genutils==0.2.0
-ipywidgets==7.7.1
-jedi==0.18.1
-Jinja2==3.1.2
-joblib==1.1.0
-jsonschema==4.9.1
-jupyter==1.0.0
-jupyter-client==7.3.4
-jupyter-console==6.4.4
-jupyter-core==4.11.1
-jupyterlab-pygments==0.2.2
-jupyterlab-widgets==1.1.1
-kiwisolver==1.4.4
-llvmlite==0.39.0
-lxml==4.9.1
-MarkupSafe==2.1.1
-matplotlib==3.5.3
-matplotlib-inline==0.1.3
-mistune==2.0.3
-nbclient==0.6.6
-nbconvert==6.5.3
-nbformat==5.4.0
-nest-asyncio==1.5.5
-notebook==6.4.12
-numba==0.56.0
-numpy==1.22.4
 opencv-python==4.6.0.66
-packaging==21.3
-pandas==1.4.3
-pandocfilters==1.5.0
-parso==0.8.3
-patsy==0.5.2
-pexpect==4.8.0
-pickleshare==0.7.5
-Pillow==9.2.0
-pluggy==1.0.0
-probscale==0.2.5
-prometheus-client==0.14.1
-prompt-toolkit==3.0.30
-protobuf==3.20.1
-psutil==5.9.1
-ptyprocess==0.7.0
-pure-eval==0.2.2
-py==1.11.0
-pycparser==2.21
-pyevtk==1.5.0
+pip-chill==1.0.1
 pygeostat==1.1.1
-Pygments==2.13.0
-pyparsing==3.0.9
-pyperclip==1.8.2
-pyrsistent==0.18.1
-pytest==7.1.2
-python-dateutil==2.8.2
-pytz==2022.2.1
-PyYAML==6.0
-pyzmq==23.2.1
-qtconsole==5.3.1
-QtPy==2.2.0
-requests==2.28.1
-scikit-learn==1.1.2
-scipy==1.9.0
-Send2Trash==1.8.0
-six==1.16.0
-soupsieve==2.3.2.post1
-stack-data==0.4.0
-statsmodels==0.13.2
-temp==2020.7.2
-tensorboardX==2.5.1
-terminado==0.15.0
-threadpoolctl==3.1.0
-tinycss2==1.1.1
-tomli==2.0.1
-torch==1.12.1
+pyyaml==6.0
+scikit-image==0.19.3
+seaborn==0.11.2
+split-folders==0.5.1
+tensorboardx==2.5.1
 torchvision==0.13.1
-tornado==6.2
-tqdm==4.64.0
-traitlets==5.3.0
-typing_extensions==4.3.0
-urllib3==1.26.11
-wcwidth==0.2.5
-webencodings==0.5.1
-widgetsnbextension==3.6.1
+# argon2-cffi==21.3.0 # Installed as dependency for notebook
+# argon2-cffi-bindings==21.2.0 # Installed as dependency for argon2-cffi
+# asttokens==2.0.8 # Installed as dependency for stack-data
+# attrs==22.1.0 # Installed as dependency for jsonschema, pytest
+# backcall==0.2.0 # Installed as dependency for ipython
+# beautifulsoup4==4.11.1 # Installed as dependency for nbconvert
+# bleach==5.0.1 # Installed as dependency for nbconvert
+# certifi==2022.6.15 # Installed as dependency for requests
+# cffi==1.15.1 # Installed as dependency for argon2-cffi-bindings
+# charset-normalizer==2.1.0 # Installed as dependency for requests
+# cycler==0.11.0 # Installed as dependency for matplotlib
+# debugpy==1.6.2 # Installed as dependency for ipykernel
+# decorator==5.1.1 # Installed as dependency for ipython
+# defusedxml==0.7.1 # Installed as dependency for nbconvert
+# entrypoints==0.4 # Installed as dependency for nbconvert, jupyter-client
+# executing==0.10.0 # Installed as dependency for stack-data
+# fastjsonschema==2.16.1 # Installed as dependency for nbformat
+# fonttools==4.35.0 # Installed as dependency for matplotlib
+# h5py==3.7.0 # Installed as dependency for pygeostat
+# idna==3.3 # Installed as dependency for requests
+# imageio==2.21.1 # Installed as dependency for scikit-image
+# iniconfig==1.1.1 # Installed as dependency for pytest
+# ipykernel==6.15.1 # Installed as dependency for ipywidgets, qtconsole, jupyter-console, jupyter, notebook
+# ipython==8.4.0 # Installed as dependency for ipywidgets, jupyter-console, ipykernel
+# ipython-genutils==0.2.0 # Installed as dependency for ipywidgets, qtconsole, notebook
+# ipywidgets==7.7.1 # Installed as dependency for jupyter
+# jedi==0.18.1 # Installed as dependency for ipython
+# jinja2==3.1.2 # Installed as dependency for nbconvert, notebook
+# joblib==1.1.0 # Installed as dependency for scikit-learn
+# jsonschema==4.9.1 # Installed as dependency for nbformat
+# jupyter==1.0.0 # Installed as dependency for pygeostat
+# jupyter-client==7.3.4 # Installed as dependency for nbclient, qtconsole, ipykernel, jupyter-console, notebook, pygeostat
+# jupyter-console==6.4.4 # Installed as dependency for jupyter
+# jupyter-core==4.11.1 # Installed as dependency for nbconvert, nbformat, jupyter-client, qtconsole, notebook
+# jupyterlab-pygments==0.2.2 # Installed as dependency for nbconvert
+# jupyterlab-widgets==1.1.1 # Installed as dependency for ipywidgets
+# kiwisolver==1.4.4 # Installed as dependency for matplotlib
+# llvmlite==0.39.0 # Installed as dependency for numba
+# lxml==4.9.1 # Installed as dependency for nbconvert
+# markupsafe==2.1.1 # Installed as dependency for nbconvert, jinja2
+# matplotlib==3.5.3 # Installed as dependency for probscale, seaborn, pygeostat
+# matplotlib-inline==0.1.3 # Installed as dependency for ipython, ipykernel
+# mistune==0.8.4 # Installed as dependency for nbconvert
+# nbclient==0.6.6 # Installed as dependency for nbconvert
+# nbconvert==6.5.3 # Installed as dependency for jupyter, notebook, pygeostat
+# nbformat==5.4.0 # Installed as dependency for nbclient, nbconvert, notebook, pygeostat
+# nest-asyncio==1.5.5 # Installed as dependency for nbclient, jupyter-client, ipykernel, notebook
+# networkx==2.8.5 # Installed as dependency for scikit-image
+# notebook==6.4.12 # Installed as dependency for widgetsnbextension, jupyter
+# numba==0.56.0 # Installed as dependency for pygeostat
+# numpy==1.22.4 # Installed as dependency for matplotlib, seaborn, opencv-python, tensorboardx, pygeostat, numba, scikit-learn, probscale, pywavelets, imageio, tifffile, torchvision, patsy, scipy, statsmodels, scikit-image, pyevtk, h5py, pandas
+# packaging==21.3 # Installed as dependency for nbconvert, matplotlib, ipykernel, qtpy, statsmodels, scikit-image, pytest
+# pandas==1.4.3 # Installed as dependency for seaborn, pygeostat, statsmodels
+# pandocfilters==1.5.0 # Installed as dependency for nbconvert
+# parso==0.8.3 # Installed as dependency for jedi
+# patsy==0.5.2 # Installed as dependency for statsmodels
+# pexpect==4.8.0 # Installed as dependency for ipython
+# pickleshare==0.7.5 # Installed as dependency for ipython
+# pillow==9.2.0 # Installed as dependency for matplotlib, imageio, torchvision, scikit-image, pygeostat
+# pluggy==1.0.0 # Installed as dependency for pytest
+# probscale==0.2.5 # Installed as dependency for pygeostat
+# prometheus-client==0.14.1 # Installed as dependency for notebook
+# prompt-toolkit==3.0.30 # Installed as dependency for jupyter-console, ipython
+# protobuf==3.20.1 # Installed as dependency for tensorboardx
+# psutil==5.9.1 # Installed as dependency for ipykernel
+# ptyprocess==0.7.0 # Installed as dependency for terminado, pexpect
+# pure-eval==0.2.2 # Installed as dependency for stack-data
+# py==1.11.0 # Installed as dependency for pytest
+# pycparser==2.21 # Installed as dependency for cffi
+# pyevtk==1.5.0 # Installed as dependency for pygeostat
+# pygments==2.13.0 # Installed as dependency for jupyter-console, nbconvert, ipython, qtconsole
+# pyparsing==3.0.9 # Installed as dependency for matplotlib, packaging
+# pyperclip==1.8.2 # Installed as dependency for pygeostat
+# pyrsistent==0.18.1 # Installed as dependency for jsonschema
+# pytest==7.1.2 # Installed as dependency for pygeostat
+# python-dateutil==2.8.2 # Installed as dependency for matplotlib, jupyter-client, pandas
+# pytz==2022.2.1 # Installed as dependency for pandas
+# pywavelets==1.3.0 # Installed as dependency for scikit-image
+# pyzmq==23.2.1 # Installed as dependency for qtconsole, jupyter-client, ipykernel, notebook
+# qtconsole==5.3.1 # Installed as dependency for jupyter
+# qtpy==2.2.0 # Installed as dependency for qtconsole
+# requests==2.28.1 # Installed as dependency for torchvision
+# scikit-learn==1.1.2 # Installed as dependency for pygeostat
+# scipy==1.9.0 # Installed as dependency for scikit-learn, seaborn, statsmodels, scikit-image, pygeostat
+# send2trash==1.8.0 # Installed as dependency for notebook
+# six==1.16.0 # Installed as dependency for python-dateutil, bleach, patsy, asttokens
+# soupsieve==2.3.2.post1 # Installed as dependency for beautifulsoup4
+# stack-data==0.4.0 # Installed as dependency for ipython
+# statsmodels==0.13.2 # Installed as dependency for pygeostat
+# temp==2020.7.2 # Installed as dependency for pygeostat
+# terminado==0.15.0 # Installed as dependency for notebook
+# threadpoolctl==3.1.0 # Installed as dependency for scikit-learn
+# tifffile==2022.8.12 # Installed as dependency for scikit-image
+# tinycss2==1.1.1 # Installed as dependency for nbconvert
+# tomli==2.0.1 # Installed as dependency for pytest
+# torch==1.12.1 # Installed as dependency for torchvision
+# tornado==6.2 # Installed as dependency for jupyter-client, ipykernel, notebook, terminado
+# tqdm==4.64.0 # Installed as dependency for pygeostat
+# traitlets==5.3.0 # Installed as dependency for ipywidgets, nbclient, nbconvert, jupyter-client, ipykernel, nbformat, qtconsole, notebook, jupyter-core, matplotlib-inline, ipython
+# typing-extensions==4.3.0 # Installed as dependency for torch, torchvision
+# urllib3==1.26.11 # Installed as dependency for requests
+# wcwidth==0.2.5 # Installed as dependency for prompt-toolkit
+# webencodings==0.5.1 # Installed as dependency for tinycss2, bleach
+# widgetsnbextension==3.6.1 # Installed as dependency for ipywidgets
