@@ -323,7 +323,7 @@ def train(args) -> None:
         Generator.eval()
 
         # Generate new samples to save
-        z_sample = Variable(torch.randn(100, args["latent_dim"]))
+        z_sample = Variable(torch.randn(args["latent_dim"], args["latent_dim"]))
         if args["cuda"]:
             z_sample = z_sample.to(DEVICE, non_blocking=True)
 

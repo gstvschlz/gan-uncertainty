@@ -16,8 +16,6 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 
 def get_args():
     parser = argparse.ArgumentParser(description='Perform easy SNESIM simulations with this CLI!')
-  || teste de tabela ||
-  || alo ||
     parser.add_argument('--samples_path', default="data/samples50",
                         type=str, help='Samples path')
 
@@ -94,7 +92,7 @@ rotangle.dat                  - file for rotation and affinity
         parfile.write(parameter)
 
 def read_conditional_samples(filename: object = 'eas.dat', nanval: object = -997799) -> object:
-    debug_level = 1
+    debug_level = 0
     if not (os.path.isfile(filename)):
         print("Filename:'%s', does not exist" % filename)
 

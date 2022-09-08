@@ -15,7 +15,7 @@
 <h2 id="results" > Results and discussion</h2>
 
   
-<h2 id="usage" > 👷 Usage </h2>
+<h3 id="usage" > 👷 Usage </h2>
 
 Pre-requisites to run the script included in the `requirements.txt` file .
 
@@ -49,10 +49,35 @@ In the project folder, navigate to the `SNESIM` folder, and then execute the scr
 | `--seed`         | The initial seed for the simulation.                                                           |
 | `--plot`         | A boolean value for whether you want to plot/save the results or not.                          |
 
-<h3 id="usage-gan" > Running the proposed workflow </h3>
-<h4>Training</h4>
+<h2 id="usage-gan" > Running the proposed workflow </h3>
+<h3>Training</h4>
+If you wish to train a new model on unseen data, you can follow the next steps:
 
-<h4>Sampling with pre-trained model</h4>
+```
+cd generative_model/
+python3 gan.py
+```
+The training will get all the information on hyperparameters from the `parameters.yaml` file
+
+| Argument name    | Description                                                                                    |
+|------------------|------------------------------------------------------------------------------------------------|
+| `output_dir`     | The output directory for the augmented images.                                                 |
+| `training_image` | The training image path in `.png` format.                                                      |
+| `checkpoint`     | The checkpoint folder which the models will be stored.                                         |
+| `sample_images`  | The folder where the sampled examples from the network will be saved.                          |
+| `num_channels`   | Number of channels in the image                                                                |
+| `latent_dim`     | The latent dimension vector size representing the features.                                    |
+| `learning_rate`  | The learning rate for the Adam optimizers                                                      |
+| `images_path`    | The output directory for the windowed images.                                                  |
+| `batch_size`     | The batch size for the training step.                                                          |
+| `num_workers`    | The number of workers to load the dataset.                                                     |
+| `num_epochs`     | The number of epochs for training step.                                                        |
+| `cuda`           | A boolean value for whether you want to use the CUDA device or not.                            |
+| `n_critic`       | The number of steps to train the Critic after `n` iterations of the Generator.                 |
+
+
+<h3>Sampling with pre-trained model</h4>
+
 
 
 <h2 id="citation" > ✍️ Citation </h2>

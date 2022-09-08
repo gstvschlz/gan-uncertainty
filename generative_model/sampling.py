@@ -1,5 +1,6 @@
 # Unconditional sampling from Generator network
 
+import gc
 import os
 import re
 import cv2
@@ -15,8 +16,8 @@ from tqdm import tqdm
 from graphics.plot import *
 from torch.autograd import Variable
 
-n = 5
-MAX = 10
+n = 1
+MAX = 99
 
 def get_args():
     parser = argparse.ArgumentParser(description="Easily samples images from the Generator network!")
@@ -41,8 +42,8 @@ def seeds(initial_seed: int) -> None:
     random.seed(initial_seed)
 
 
-def load_model(latent_space:int , state_dictionary: dict) -> nn.Module:
-    model = GeneratorModel(latent_size)
+def load_model(state_dictionary: dict, latent_space:int = 100) -> nn.Module:
+    model = GeneratorModel(latent_space)
     model.load_state_dict(state_dictionary["Generator"])
     return model
 
@@ -145,9 +146,12 @@ def create_out_file(samples, n:int):
     for image in tqdm(samples,
                     desc="Saving samples from GAN, please wait...",
                     total=len(samples), colour='blue'):
-        resized_image = cv2.resize(image, (150, 150))
+        image = image.reshape(128, 128)*255
+        resized_image = cv2.resize(image, dsize=(150, 150),
+                            interpolation=cv2.INTER_CUBIC)
         binarized_image = np.where(resized_image > 0.5, 1, 0)
         numpy_tensor = binarized_image.squeeze().ravel()
+        
         try:
             # Loads file and save with new image
             dataset = np.loadtxt(f"data/generated.out")
@@ -165,20 +169,19 @@ def create_out_file(samples, n:int):
     
     # Saves 
     numpy_array = np.loadtxt("data/generated.out")
-    header_name = [f'ti_{idx}' for idx in range(numpy_array.reshape(n*MAX, 150, 150).shape[0])]
+    header_name = [f'ti_{idx}' for idx in range(numpy_array.reshape(100, 150, 150).shape[0])]
     header_name = f'\n'.join(header_name)
 
     # Save again with header
     np.savetxt(fname="data/generated.out",
                 X=numpy_array,
-                header=f"gan\n{numpy_array.reshape(n*MAX, 150, 150).shape[1]}\n{header_name}", comments="", fmt="%1d")
+                header=f"gan\n{numpy_array.reshape(100, 150, 150).shape[1]}\n{header_name}", comments="", fmt="%1d")
 
 
 def __create_folders():
     os.makedirs("data/out_files", exist_ok=True)
     os.makedirs("data/parfiles", exist_ok=True)
     os.makedirs("data/simulations", exist_ok=True)
-    os.makedirs("data/results", exist_ok=True)
     os.makedirs("data/results", exist_ok=True)
 
 
@@ -199,7 +202,7 @@ def _execute_script(index: int):
 
 def simulate(samples_array, n):
     seed_initial: int = 69069
-    n_reals = n*MAX
+    n_reals = 100
     seeds_list = gs.rseed_list(nseeds=n_reals, seed=seed_initial)
 
     for idx, image in enumerate(samples_array):
@@ -219,34 +222,31 @@ def simulate(samples_array, n):
 
 def plots():
     print("[INFO] Loading simulations", end="\r")
-    realizations = concatenate_out_files("data/simulations/")
+    gan_realizations = concatenate_out_files("data/simulations/")
+    np.save("data/realizations.npy", gan_realizations, allow_pickle=True)
 
     ti_dict = dict()
-    for idx, realization in enumerate(realizations):
+    for idx, realization in enumerate(gan_realizations):
         ti_dict[f'ti_{idx+1}'] = np.array(realization.reshape(-1))
 
-    dataframe = pd.DataFrame(ti_dict)
-    plot_uncertainty(dataframe)
-    plot_realizations_grid(realizations)
+    gan_dataframe = pd.DataFrame(ti_dict)
+    plot_uncertainty(gan_dataframe)
+    plot_realizations_grid(gan_realizations)
 
     file = read_conditional_samples("../snesim/data/snesim.out")["D"]
-    realizations = file[:, 0].reshape(50, 150, 150)
-    
-    print("[INFO] Loading simulations", end="\r")
-    snesim_gen_realizations = concatenate_out_files("data/simulations/")
-    np.save("data/realizations.npy", snesim_gen_realizations, allow_pickle=True)
+    snesim_realizations = file[:, 0].reshape(100, 150, 150)
 
-    proportions_comparison(realizations,
-                       snesim_gen_realizations)
+    proportions_comparison(snesim_realizations,
+                       gan_realizations)
 
-    histplots(realizations, dataframe)
+    histplots(snesim_realizations, gan_dataframe)
 
     mds_plots(snesim_realizations_path="../snesim/data/realizations.npy",
             gan_realizations_path="data/realizations.npy")
 
 
 if __name__ == "__main__":
-    seeds(69069)
+    seeds(303255)
 
     # Create folders and get parameters
     __create_folders()
@@ -255,34 +255,50 @@ if __name__ == "__main__":
     latent_size = 100
     state_dict = torch.load(param.model_path, map_location='cpu')
 
-    generator = load_model(latent_size, state_dict)
+    generator = load_model(state_dict)
 
     uncond = Unconditional(1, generator, latent_size, "normal")
 
     print("[INFO] Sampling images from GAN")
     all_samples = []
 
-    import gc
-    for i in range(n):
-        samples = uncond.create_unconditional_simulations(MAX, [i, i, i])
-        all_samples.append(samples)
-        gc.collect()
-    samples = np.array(all_samples).reshape(n*MAX, 1, 128, 128)
-    samples_arr = np.where(np.concatenate(samples, 0)*0.5+0.5 >= 0.5, 1.0, 0.0)
+    i = 0
+
+    # Reads and resize Strebelle TI
+    ti = cv2.imread("strebelle.png")
+    ti = cv2.resize(ti, (128, 128), 0)
+    ti = cv2.cvtColor(ti, cv2.COLOR_BGR2GRAY)
+    ti = (ti < 127)*1
+
+    while len(all_samples) < 100:
+        sample = uncond.create_unconditional_simulations(10, [i, i, i])
+        print(f"Sampled images: {len(all_samples)}")
+        picture1_norm = ti/np.sqrt(np.sum(ti**2))
+        for real in sample:
+            real = (real.reshape(128,128) > 0)
+            picture2_norm = real/np.sqrt(np.sum(real**2))
+            if np.sum(picture2_norm*picture1_norm) >= 0.45:
+                if len(all_samples) == 100: break
+                all_samples.append(real)
+                i = i+1
+                gc.collect()
+    samples = np.array(all_samples).reshape(100, 1, 128, 128)
+    samples_arr = np.where(np.concatenate(samples, 0)*1 >= 0.5, 1.0, 0.0)
 
     print("[INFO] Images sampled!")
     create_out_file(samples_arr, n)
 
     # Performs SNESIM simulations
     # Prepare each TI
-    create_ti_files(samples_arr)
+    create_ti_files(samples_arr)     
 
     # Simulated
     simulate(samples_arr, n)
-    
+
     # Starts plotting
     plots()
 
     # Remove unnecessary files after execution
     shutil.rmtree("data/parfiles")
-    shutil.rmtree("data/out_files")  
+    shutil.rmtree("data/out_files")
+    shutil.rmtree("data/simulations")

@@ -161,3 +161,5 @@ scikit-mps/
 
 windowed_ti/*
 strebelle*.png
+*.4
+.ipynb

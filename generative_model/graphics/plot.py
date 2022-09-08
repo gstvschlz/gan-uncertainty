@@ -66,11 +66,10 @@ def etype_plot(dict_ti: pd.DataFrame):
 def calculate_uncertainty(dict_ti: pd.DataFrame):
     _data = dict_ti.copy()
 
-    _data['prob_sand'] = _data.sum(axis=1)
-    _data['prob_shale'] = 100 - _data['prob_sand']
+    _data['prob_sand'] = _data.mean(axis=1)
+    _data['prob_shale'] = 1 - _data['prob_sand']
 
-    _data["u_max"] = _data[["prob_shale", "prob_sand"]].max(axis=1) / 100
-    _data["u_min"] = _data[["prob_shale", "prob_sand"]].min(axis=1) / 100
+    _data["uncertainty"] = _data[["prob_shale", "prob_sand"]].min(axis=1)
 
     _data.drop('prob_sand', axis=1, inplace=True)
     _data.drop('prob_shale', axis=1, inplace=True)
@@ -84,7 +83,7 @@ def plot_uncertainty(dict_ti: pd.DataFrame):
 
     _data = calculate_uncertainty(_data)
 
-    plt.imshow(_data['u_min'].values.reshape(150, 150),
+    plt.imshow(_data['uncertainty'].values.reshape(150, 150),
               cmap='gray', origin='lower')
 
     plt.title("Simulation uncertainty from proposed workflow")
@@ -187,12 +186,13 @@ def proportions_comparison(real: numpy.ndarray, fake:numpy.ndarray) -> None:
         sand, shale = get_sand_shale_proportion(real[i].reshape(-1))
         sand_values.append(sand)
         shale_values.append(shale)
+    
 
     df_dict = dict(Sand=sand_values, Shale=shale_values)
-    df = pd.DataFrame.from_dict(df_dict, orient='columns')
+    df_snesim = pd.DataFrame.from_dict(df_dict, orient='columns')
 
     # Boxplot
-    bp = ax[0].boxplot(df, labels=["Sandstone", "Shale"],
+    bp = ax[0].boxplot(df_snesim, labels=["Sandstone", "Shale"],
                        patch_artist=True, showfliers=False)
     ax[0].set_ylabel('Percentage (%)')
     ax[0].set_xlabel('Category')
@@ -214,10 +214,10 @@ def proportions_comparison(real: numpy.ndarray, fake:numpy.ndarray) -> None:
         shale_values.append(shale)
 
     df_dict = dict(Sand=sand_values, Shale=shale_values)
-    df = pd.DataFrame.from_dict(df_dict, orient='columns')
+    df_gan = pd.DataFrame.from_dict(df_dict, orient='columns')
 
     # Boxplot
-    bp = ax[1].boxplot(df, labels=["Sandstone", "Shale"],
+    bp = ax[1].boxplot(df_gan, labels=["Sandstone", "Shale"],
                        patch_artist=True, showfliers=False)
 
     for element in ['boxes', 'whiskers', 'fliers', 'means', 'medians', 'caps']:
@@ -232,8 +232,7 @@ def proportions_comparison(real: numpy.ndarray, fake:numpy.ndarray) -> None:
     ax[1].set_ylabel('Percentage (%)')
     ax[1].set_xlabel('Category')
     ax[1].set_title('Training Images proportions (Proposed workflow)')
-
-    plt.savefig("data/results/boxplot_snesim.png", dpi=600, bbox_inches='tight')
+    #plt.savefig("data/results/boxplot_snesim.png", dpi=600, bbox_inches='tight')
 
 
 def histplots(snesim_realizations, gan_dataframe):
@@ -250,19 +249,20 @@ def histplots(snesim_realizations, gan_dataframe):
     data_snesim = calculate_uncertainty(snesim_dataframe)
     data_gan = calculate_uncertainty(gan_dataframe)
 
-    sns.kdeplot(data_snesim['u_min'], color='black')
-    sns.kdeplot(data_gan['u_min'], color='green')
+    sns.kdeplot(data_snesim['uncertainty'], color='black')
+    sns.kdeplot(data_gan['uncertainty'], color='blue')
     plt.title("Uncertainty histogram")
+    plt.xlabel("Uncertainty values")
 
-    plt.legend([f"Traditional workflow (Mean:{round(data_snesim['u_min'].mean()*100, 3)}%)",
-     f"Proposed workflow (Mean:{round(data_gan['u_min'].mean()*100, 3)}%)"])
+    plt.legend([f"Traditional workflow (Mean:{round(data_snesim['uncertainty'].mean()*100, 3)}%)",
+     f"Proposed workflow (Mean:{round(data_gan['uncertainty'].mean()*100, 3)}%)"])
     plt.savefig("data/results/histplot.png", dpi=600, bbox_inches='tight')
 
 
 def plot_mds(original, gan):
     plt.style.use("seaborn")
     fig, ax = plt.subplots(1, 1, figsize=(5.5, 4))
-    plt.scatter(x=gan[:, 0], y=gan[:, 1], color="limegreen")
+    plt.scatter(x=gan[:, 0], y=gan[:, 1], color="blue")
     plt.scatter(x=original[:, 0], y=original[:, 1], color="black")
     plt.title("Multidimensional scaling")
     plt.legend(["Proposed workflow", "Traditional workflow"],
