@@ -288,7 +288,7 @@ def mds_plots(snesim_realizations_path, gan_realizations_path):
 
 
 def read_conditional_samples(filename: object = 'eas.dat', nanval: object = -997799) -> object:
-    debug_level = 1
+    debug_level = 0
     if not (os.path.isfile(filename)):
         print("Filename:'%s', does not exist" % filename)
 

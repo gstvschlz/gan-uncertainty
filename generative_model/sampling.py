@@ -13,24 +13,30 @@ import numpy as np
 import torch.nn as nn
 
 from tqdm import tqdm
-from graphics.plot import *
 from torch.autograd import Variable
 
 n = 1
 MAX = 99
+BAD_EXAMPLES = list()
 
 def get_args():
-    parser = argparse.ArgumentParser(description="Easily samples images from the Generator network!")
+    parser = argparse.ArgumentParser(
+        description="Easily samples images from the Generator network!"
+    )
 
-    parser.add_argument("--model_path", default="Epoch_155.ckpt", type=str, help="Generator model path")
-    parser.add_argument("--num_samples", default=100, type=int, help="Number of samples to be generated")
-    
+    parser.add_argument(
+        "--model_path", default="Epoch_155.ckpt", type=str, help="Generator model path"
+    )
+    parser.add_argument(
+        "--num_samples", default=100, type=int, help="Number of samples to be generated"
+    )
+
     args = parser.parse_args()
     return args
 
 
 def seeds(initial_seed: int) -> None:
-    os.environ['PYTHONHASHSEED'] = str(initial_seed)
+    os.environ["PYTHONHASHSEED"] = str(initial_seed)
 
     # Torch RNG
     torch.manual_seed(initial_seed)
@@ -42,7 +48,7 @@ def seeds(initial_seed: int) -> None:
     random.seed(initial_seed)
 
 
-def load_model(state_dictionary: dict, latent_space:int = 100) -> nn.Module:
+def load_model(state_dictionary: dict, latent_space: int = 100) -> nn.Module:
     model = GeneratorModel(latent_space)
     model.load_state_dict(state_dictionary["Generator"])
     return model
@@ -100,39 +106,48 @@ class GeneratorModel(nn.Module):
         super(GeneratorModel, self).__init__()
 
         def genblock(dim_in, dim_out):
-            
-            block = nn.Sequential(nn.ConvTranspose2d(in_channels=dim_in,
-                                                     out_channels=dim_out,
-                                                     kernel_size=5,
-                                                     stride=2,
-                                                     padding=2,
-                                                     output_padding=1,
-                                                     bias=False),
-                                  nn.BatchNorm2d(dim_out),
-                                  nn.ReLU()
-                                  )
+
+            block = nn.Sequential(
+                nn.ConvTranspose2d(
+                    in_channels=dim_in,
+                    out_channels=dim_out,
+                    kernel_size=5,
+                    stride=2,
+                    padding=2,
+                    output_padding=1,
+                    bias=False,
+                ),
+                nn.BatchNorm2d(dim_out),
+                nn.ReLU(),
+            )
             return block
 
         def genimg(dim_in):
-            block = nn.Sequential(nn.ConvTranspose2d(in_channels=dim_in,
-                                                     out_channels=1,
-                                                     kernel_size=5,
-                                                     stride=2,
-                                                     padding=2,
-                                                     output_padding=1,
-                                                     ),
-                                  nn.Tanh()
-                                  )
+            block = nn.Sequential(
+                nn.ConvTranspose2d(
+                    in_channels=dim_in,
+                    out_channels=1,
+                    kernel_size=5,
+                    stride=2,
+                    padding=2,
+                    output_padding=1,
+                ),
+                nn.Tanh(),
+            )
             return block
 
-        self.prepare = nn.Sequential(nn.Linear(dim_in, dim*8*4*4, bias=False),
-                                     nn.BatchNorm1d(dim*8*4*4),
-                                     nn.ReLU())
-        self.generate = nn.Sequential(genblock(dim*8, dim*16),
-                                      genblock(dim*16, dim*8),
-                                      genblock(dim*8, dim*4),
-                                      genblock(dim*4, dim*2),
-                                      genimg(dim*2))
+        self.prepare = nn.Sequential(
+            nn.Linear(dim_in, dim * 8 * 4 * 4, bias=False),
+            nn.BatchNorm1d(dim * 8 * 4 * 4),
+            nn.ReLU(),
+        )
+        self.generate = nn.Sequential(
+            genblock(dim * 8, dim * 16),
+            genblock(dim * 16, dim * 8),
+            genblock(dim * 8, dim * 4),
+            genblock(dim * 4, dim * 2),
+            genimg(dim * 2),
+        )
 
     def forward(self, x):
         """Forward pass function."""
@@ -142,40 +157,55 @@ class GeneratorModel(nn.Module):
         return x
 
 
-def create_out_file(samples, n:int):
-    for image in tqdm(samples,
-                    desc="Saving samples from GAN, please wait...",
-                    total=len(samples), colour='blue'):
-        image = image.reshape(128, 128)*255
-        resized_image = cv2.resize(image, dsize=(150, 150),
-                            interpolation=cv2.INTER_CUBIC)
+def create_out_file(samples, n: int):
+    for image in tqdm(
+        samples,
+        desc="Saving samples from GAN, please wait...",
+        total=len(samples),
+        colour="blue",
+    ):
+        image = image.reshape(128, 128) * 255
+        resized_image = cv2.resize(
+            image, dsize=(150, 150), interpolation=cv2.INTER_CUBIC
+        )
         binarized_image = np.where(resized_image > 0.5, 1, 0)
         numpy_tensor = binarized_image.squeeze().ravel()
-        
+
         try:
             # Loads file and save with new image
             dataset = np.loadtxt(f"data/generated.out")
             new_TI = np.column_stack((dataset, numpy_tensor))
-            np.savetxt(fname = "data/generated.out", X = new_TI, 
-                        newline = os.linesep,
-                        header=f"150 150 1\n1\nfacies\n")
+            np.savetxt(
+                fname="data/generated.out",
+                X=new_TI,
+                newline=os.linesep,
+                header=f"150 150 1\n1\nfacies\n",
+            )
             new_TI = np.column_stack((dataset, numpy_tensor))
-        
+
         except FileNotFoundError:
-                np.savetxt(fname = f"data/generated.out",
-                        X=numpy_tensor,
-                        newline = os.linesep,
-                        header=f"150 150 1\n1\nfacies\n")
-    
-    # Saves 
+            np.savetxt(
+                fname=f"data/generated.out",
+                X=numpy_tensor,
+                newline=os.linesep,
+                header=f"150 150 1\n1\nfacies\n",
+            )
+
+    # Saves
     numpy_array = np.loadtxt("data/generated.out")
-    header_name = [f'ti_{idx}' for idx in range(numpy_array.reshape(100, 150, 150).shape[0])]
-    header_name = f'\n'.join(header_name)
+    header_name = [
+        f"ti_{idx}" for idx in range(numpy_array.reshape(100, 150, 150).shape[0])
+    ]
+    header_name = f"\n".join(header_name)
 
     # Save again with header
-    np.savetxt(fname="data/generated.out",
-                X=numpy_array,
-                header=f"gan\n{numpy_array.reshape(100, 150, 150).shape[1]}\n{header_name}", comments="", fmt="%1d")
+    np.savetxt(
+        fname="data/generated.out",
+        X=numpy_array,
+        header=f"gan\n{numpy_array.reshape(100, 150, 150).shape[1]}\n{header_name}",
+        comments="",
+        fmt="%1d",
+    )
 
 
 def __create_folders():
@@ -191,7 +221,13 @@ def create_ti_files(samples):
         image_resized = np.where(im > 0.5, 1, 0)
 
         # save as .out
-        np.savetxt(f"data/out_files/ti_{idx}.out", image_resized.reshape(-1), header="150 150 1\n1\nfacies", fmt="%1d",comments='')
+        np.savetxt(
+            f"data/out_files/ti_{idx}.out",
+            image_resized.reshape(-1),
+            header="150 150 1\n1\nfacies",
+            fmt="%1d",
+            comments="",
+        )
 
 
 def _execute_script(index: int):
@@ -207,42 +243,17 @@ def simulate(samples_array, n):
 
     for idx, image in enumerate(samples_array):
         image = cv2.resize(image, (150, 150))
-        image = (image > 0.5)
+        image = image > 0.5
 
-        with open("data/gan.par", 'r') as parfile:
+        with open("data/gan.par", "r") as parfile:
             par = parfile.read()
             par_replaced = par.replace(f"_0.out", f"_{idx}.out")
             par_ready = re.sub("\d{5,6}", f"{seeds_list[idx]}", par_replaced)
-            
-            with open(f"data/parfiles/snesim_gan_{idx}.par", 'w+') as file:
+
+            with open(f"data/parfiles/snesim_gan_{idx}.par", "w+") as file:
                 file.write(par_ready)
         _execute_script(idx)
         os.chdir("..")
-
-
-def plots():
-    print("[INFO] Loading simulations", end="\r")
-    gan_realizations = concatenate_out_files("data/simulations/")
-    np.save("data/realizations.npy", gan_realizations, allow_pickle=True)
-
-    ti_dict = dict()
-    for idx, realization in enumerate(gan_realizations):
-        ti_dict[f'ti_{idx+1}'] = np.array(realization.reshape(-1))
-
-    gan_dataframe = pd.DataFrame(ti_dict)
-    plot_uncertainty(gan_dataframe)
-    plot_realizations_grid(gan_realizations)
-
-    file = read_conditional_samples("../snesim/data/snesim.out")["D"]
-    snesim_realizations = file[:, 0].reshape(100, 150, 150)
-
-    proportions_comparison(snesim_realizations,
-                       gan_realizations)
-
-    histplots(snesim_realizations, gan_dataframe)
-
-    mds_plots(snesim_realizations_path="../snesim/data/realizations.npy",
-            gan_realizations_path="data/realizations.npy")
 
 
 if __name__ == "__main__":
@@ -253,7 +264,7 @@ if __name__ == "__main__":
     param = get_args()
 
     latent_size = 100
-    state_dict = torch.load(param.model_path, map_location='cpu')
+    state_dict = torch.load(param.model_path, map_location="cpu")
 
     generator = load_model(state_dict)
 
@@ -268,35 +279,39 @@ if __name__ == "__main__":
     ti = cv2.imread("strebelle.png")
     ti = cv2.resize(ti, (128, 128), 0)
     ti = cv2.cvtColor(ti, cv2.COLOR_BGR2GRAY)
-    ti = (ti < 127)*1
+    ti = (ti < 127) * 1
 
     while len(all_samples) < 100:
         sample = uncond.create_unconditional_simulations(10, [i, i, i])
         print(f"Sampled images: {len(all_samples)}")
-        picture1_norm = ti/np.sqrt(np.sum(ti**2))
+        picture1_norm = ti / np.sqrt(np.sum(ti**2))
         for real in sample:
-            real = (real.reshape(128,128) > 0)
-            picture2_norm = real/np.sqrt(np.sum(real**2))
-            if np.sum(picture2_norm*picture1_norm) >= 0.45:
-                if len(all_samples) == 100: break
+            real = real.reshape(128, 128) > 0
+            picture2_norm = real / np.sqrt(np.sum(real**2))
+            if np.sum(picture2_norm * picture1_norm) >= 0.45:
+                if len(all_samples) == 100:
+                    break
                 all_samples.append(real)
-                i = i+1
+                i = i + 1
                 gc.collect()
+            else:
+                BAD_EXAMPLES.append(real)
     samples = np.array(all_samples).reshape(100, 1, 128, 128)
-    samples_arr = np.where(np.concatenate(samples, 0)*1 >= 0.5, 1.0, 0.0)
+    samples_arr = np.where(np.concatenate(samples, 0) * 1 >= 0.5, 1.0, 0.0)
+
+    # DEBUGGING BAD EXAMPLES
+    np_bad_ex = np.array(BAD_EXAMPLES)
+    np.save("bad.npz", np_bad_ex, allow_pickle=True)
 
     print("[INFO] Images sampled!")
     create_out_file(samples_arr, n)
 
     # Performs SNESIM simulations
     # Prepare each TI
-    create_ti_files(samples_arr)     
+    create_ti_files(samples_arr)
 
     # Simulated
     simulate(samples_arr, n)
-
-    # Starts plotting
-    plots()
 
     # Remove unnecessary files after execution
     shutil.rmtree("data/parfiles")
