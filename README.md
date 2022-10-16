@@ -81,21 +81,3 @@ The training will get all the information on hyperparameters from the `parameter
 | `num_epochs`     | The number of epochs for training step.                                        |
 | `cuda`           | A boolean value for whether you want to use the CUDA device or not.            |
 | `n_critic`       | The number of steps to train the Critic after `n` iterations of the Generator. |
-
-
-<h3>Sampling with pre-trained model</h4>
-
-
-
-<h2 id="citation" > ✍️ Citation </h2>
-If you use our code for your own research, we would be grateful if you cite our publication
-[LinkToBeInserted](https://github.com/)
-
-```
-@article{test2023,
-	title={Use of Generative Adversarial Networks to incorporate the Training Image Uncertainty in Multiple-Point Statistics Simulation},
-	author={Scholze, Gustavo and Bassani, Marcel},
-	journal={-},
-	year={2023}
-}
-```
