@@ -20,7 +20,6 @@ from skimage.util import view_as_windows
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 # Filtering warnings
-
 if not sys.warnoptions:
     import warnings
 
@@ -399,6 +398,7 @@ if __name__ == "__main__":
 
     print("Saving all sliding windows...")
     save_generated_images(windows, param)
+    sys.exit(0)
 
     # Train the generative model
     train(param)

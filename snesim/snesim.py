@@ -1,11 +1,17 @@
+""" SNESIM CLI module. """
+
 import os
 import argparse
+from typing import Dict
 import numpy as np
 import pandas as pd
 
-from typing import Any
 
-def get_args():
+def get_args() -> argparse.Namespace:
+    """
+    An argument parsing function that uses `argparse`.
+    :returns: The namespace parsed.
+    """
     parser = argparse.ArgumentParser(
         description="Perform easy SNESIM simulations with this CLI!"
     )
@@ -52,18 +58,16 @@ def get_args():
 
     parser.add_argument("--seed", default=69069, type=int, help="Seed")
 
-    parser.add_argument(
-        "--plot",
-        default=True,
-        type=bool,
-        help="Boolean for whether you want to plot graphs or not",
-    )
-
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
-def change_parameters(arguments: dict) -> Any:
+def change_parameters(arguments: Dict) -> None:
+    """
+    Function to change the parfile according to the argparse commands.
+
+    :param change_parameters: The arguments as dictionary.
+    :returns: Updates the parfile in the defined path.
+    """
     parameter: str = f"""
 Parameters for SNESIM
 ***********************
@@ -102,89 +106,110 @@ rotangle.dat                  - file for rotation and affinity
 10.0   10.0   5.0             - maximum search radii (hmax,hmin,vert)
 0.0    0.0   0.0              - angles for search ellipsoid
 """
-    with open(arguments.par_path, "w") as parfile:
+    with open(arguments.par_path, mode="w", encoding="utf8") as parfile:
         parfile.write(parameter)
 
 
-def read_conditional_samples(
-    filename: object = "eas.dat", nanval: object = -997799
-) -> object:
-    debug_level = 0
-    if not (os.path.isfile(filename)):
-        print("Filename:'%s', does not exist" % filename)
+def read_conditional_samples(filename: str = "eas.dat", nanval: int = -997799) -> Dict:
+    """
+    Reads from a GSLIB-style file and returns as a dictionary.
 
-    file = open(filename, "r")
-    if debug_level > 0:
-        print("eas: file ->%20s" % filename)
+    :param filename: Path to file with conditional samples.
+    :param nanval: The value that refers to NaN samples.
+    :returns: Returns a dictionary containing information about the conditional samples.
 
-    eas = {"title": (file.readline()).strip("\n")}
+    :throws RuntimeError: Data can't be read.
+    :throws FileNotFoundError: When file is not found.
+    """
+    if not os.path.isfile(filename):
+        raise FileNotFoundError(f"File '{filename}' does not exist")
 
-    if debug_level > 0:
-        print("eas: title->%20s" % eas["title"])
+    eas = {}
 
-    dim_arr = eas["title"].split()
-    if len(dim_arr) == 3:
-        eas["dim"] = {}
-        eas["dim"]["nx"] = int(dim_arr[0])
-        eas["dim"]["ny"] = int(dim_arr[1])
-        eas["dim"]["nz"] = int(dim_arr[2])
+    with open(filename, mode="r", encoding="utf8") as file:
+        eas["title"] = file.readline().strip("\n")
+        dimensions = eas["title"].split()
 
-    eas["n_cols"] = int(file.readline())
+        if len(dimensions) == 3:
+            eas["dim"] = {
+                "nx": int(dimensions[0]),
+                "ny": int(dimensions[1]),
+                "nz": int(dimensions[2]),
+            }
 
-    eas["header"] = []
-    for i in range(0, eas["n_cols"]):
-        # print (i)
-        h_val = (file.readline()).strip("\n")
-        eas["header"].append(h_val)
-
-        if debug_level > 1:
-            print("eas: header(%2d)-> %s" % (i, eas["header"][i]))
-
-    file.close()
+        eas["n_cols"] = int(file.readline())
+        eas["header"] = [file.readline().strip("\n") for _ in range(eas["n_cols"])]
 
     try:
         eas["D"] = np.genfromtxt(filename, skip_header=2 + eas["n_cols"])
-        if debug_level > 1:
-            print("eas: Read data from %s" % filename)
-    except:
-        print("eas: COULD NOT READ DATA FROM %s" % filename)
+    except Exception as exc:
+        raise RuntimeError(f"Could not read data from '{filename}'") from exc
 
-    # add NaN values
-    try:
-        eas["D"][eas["D"] == nanval] = np.nan
-    except:
-        print("eas: FAILED TO HANDLE NaN VALUES (%d(" % nanval)
+    # Handle NaN values
+    eas["D"][eas["D"] == nanval] = np.nan
 
-    # If dimensions are given in title, then convert to 2D/3D array
+    # Convert to 2D/3D array if dimensions are given in title
     if "dim" in eas:
-        if eas["dim"]["nz"] == 1:
-            eas["Dmat"] = eas["D"].reshape((eas["dim"]["ny"], eas["dim"]["nx"]))
-        elif eas["dim"]["nx"] == 1:
-            eas["Dmat"] = np.transpose(
-                eas["D"].reshape((eas["dim"]["nz"], eas["dim"]["ny"]))
-            )
-        elif eas["dim"]["ny"] == 1:
-            eas["Dmat"] = eas["D"].reshape((eas["dim"]["nz"], eas["dim"]["nx"]))
-        else:
-            eas["Dmat"] = eas["D"].reshape(
-                (eas["dim"]["nz"], eas["dim"]["ny"], eas["dim"]["nx"])
-            )
-
-        eas["Dmat"] = eas["D"].reshape(
-            (eas["dim"]["nx"], eas["dim"]["ny"], eas["dim"]["nz"])
-        )
         eas["Dmat"] = eas["D"].reshape(
             (eas["dim"]["nz"], eas["dim"]["ny"], eas["dim"]["nx"])
         )
-
         eas["Dmat"] = np.transpose(eas["Dmat"], (2, 1, 0))
-
-        if debug_level > 0:
-            print("eas: converted data in matrixes (Dmat)")
 
     eas["filename"] = filename
 
     return eas
+
+
+def run_simulation(params: argparse.Namespace) -> None:
+    """
+    Runs SNESIM simulation with WINE.
+
+    :param: params: The argparse namespace.
+    """
+    os.system(f"echo {params.par_path} | wine {params.exe_path}")
+
+
+def load_ti(filename: str) -> np.ndarray:
+    """
+    Loads TI from filename
+    
+    :param filename: Name of the TI file.
+    :returns: Returns the file as numpy array.
+    """
+    print("[INFO] Loading TI", end="\r")
+    return read_conditional_samples(filename)["D"].reshape(1, 150, 150)[0, :, :]
+
+
+def load_conditional_data(filename: str) -> pd.DataFrame:
+    """
+    Load conditional data as pandas dataframe.
+
+    :param filename: Name for the TI conditional data.
+    :returns: The pandas dataframe regarding the X, Y and class of the sample.
+    """
+    print("[INFO] Loading conditional data", end="\r")
+    data = read_conditional_samples(filename)["D"]
+
+    samples_im = pd.DataFrame()
+    samples_im["x"] = data[:, 0]
+    samples_im["y"] = data[:, 1]
+    samples_im["class"] = data[:, 3]
+
+    return samples_im
+
+
+def save_simulations(filename: str, num_realizations: int) -> None:
+    """
+    Save simulations as numpy pickle.
+
+    :param filename: Name of the file with the desired simulations.
+    :param num_realizations: Number of realizations made to reshape accordingly.
+    """ 
+    print("[INFO] Loading simulations", end="\r")
+    data = read_conditional_samples(filename)["D"]
+    realizations = data[:, 0].reshape(num_realizations, 150, 150)
+
+    np.save("data/realizations.npy", realizations, allow_pickle=True)
 
 
 if __name__ == "__main__":
@@ -197,27 +222,11 @@ if __name__ == "__main__":
     change_parameters(args)
 
     # Calls SNESIM.exe with wine :)
-    os.system(f"echo {args.par_path} | wine {args.exe_path}")
+    run_simulation(args)
 
     # Plots graphs
-    if args.plot:
-        print("[INFO] Loading TI", end="\r")
-        file = read_conditional_samples("data/reference_ti")["D"]
-        im = file.reshape(1, 150, 150)[0, :, :]
+    ti_file = load_ti("data/reference_ti")
+    conditioning_data = load_conditional_data(args.samples_path)
 
-        conditioning_data = read_conditional_samples(args.samples_path)["D"]
-        # Hard data
-        print("[INFO] Loading conditional data", end="\r")
-
-        # Samples to dataframe
-        samples_im = pd.DataFrame()
-
-        samples_im["x"] = conditioning_data[:, 0]
-        samples_im["y"] = conditioning_data[:, 1]
-        samples_im["class"] = conditioning_data[:, 3]
-
-        print("[INFO] Loading simulations", end="\r")
-        file = read_conditional_samples(args.output_path)["D"]
-        realizations = file[:, 0].reshape(args.realizations, 150, 150)
-        np.save("data/realizations.npy", realizations, allow_pickle=True)
-        print("--- Ended traditional workflow! ---")
+    save_simulations(args.output_path, args.realizations)
+    print("--- Ended traditional workflow! ---")
