@@ -1,15 +1,15 @@
-output_dir: windowed_ti/augmented
-training_image: strebelle.png
-checkpoint: .checkpoints/
-sample_images: output/wgan
+output_dir: /workspace/windowed_ti/augmented
+training_image: /workspace/strebelle.png
+checkpoint: /workspace/checkpoints/
+sample_images: /workspace/output/wgan
 
 num_channels: 1
 latent_dim: 100
 learning_rate: 0.0002
-images_path: windowed_ti/
+images_path: /workspace/windowed_ti/
 batch_size: 64
 num_workers: 8
 
-n_epochs: 2
+n_epochs: 5
 cuda: True
 n_critic: 5

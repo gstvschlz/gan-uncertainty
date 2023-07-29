@@ -9,8 +9,10 @@ import pandas as pd
 
 def get_args() -> argparse.Namespace:
     """
-    An argument parsing function that uses `argparse`.
-    :returns: The namespace parsed.
+    Parses command line arguments using `argparse`.
+
+    Returns:
+        argparse.Namespace: Parsed command line arguments.
     """
     parser = argparse.ArgumentParser(
         description="Perform easy SNESIM simulations with this CLI!"
@@ -63,10 +65,13 @@ def get_args() -> argparse.Namespace:
 
 def change_parameters(arguments: Dict) -> None:
     """
-    Function to change the parfile according to the argparse commands.
+    Updates the parameter file based on the provided arguments.
 
-    :param change_parameters: The arguments as dictionary.
-    :returns: Updates the parfile in the defined path.
+    Args:
+        arguments (Dict): Command line arguments as a dictionary.
+
+    Note:
+        This function updates the parameter file in the specified path.
     """
     parameter: str = f"""
 Parameters for SNESIM
@@ -112,14 +117,18 @@ rotangle.dat                  - file for rotation and affinity
 
 def read_conditional_samples(filename: str = "eas.dat", nanval: int = -997799) -> Dict:
     """
-    Reads from a GSLIB-style file and returns as a dictionary.
+    Reads conditional samples from a GSLIB-style file and returns them as a dictionary.
 
-    :param filename: Path to file with conditional samples.
-    :param nanval: The value that refers to NaN samples.
-    :returns: Returns a dictionary containing information about the conditional samples.
+    Args:
+        filename (str, optional): Path to the file with conditional samples. Defaults to "eas.dat".
+        nanval (int, optional): Value representing NaN samples. Defaults to -997799.
 
-    :throws RuntimeError: Data can't be read.
-    :throws FileNotFoundError: When file is not found.
+    Returns:
+        Dict: Information about the conditional samples.
+
+    Raises:
+        RuntimeError: If the data can't be read.
+        FileNotFoundError: If the file doesn't exist.
     """
     if not os.path.isfile(filename):
         raise FileNotFoundError(f"File '{filename}' does not exist")
@@ -162,19 +171,23 @@ def read_conditional_samples(filename: str = "eas.dat", nanval: int = -997799) -
 
 def run_simulation(params: argparse.Namespace) -> None:
     """
-    Runs SNESIM simulation with WINE.
+    Runs the SNESIM simulation using WINE.
 
-    :param: params: The argparse namespace.
+    Args:
+        params (argparse.Namespace): Parsed command line arguments.
     """
     os.system(f"echo {params.par_path} | wine {params.exe_path}")
 
 
 def load_ti(filename: str) -> np.ndarray:
     """
-    Loads TI from filename
-    
-    :param filename: Name of the TI file.
-    :returns: Returns the file as numpy array.
+    Loads conditional data and returns it as a pandas DataFrame.
+
+    Args:
+        filename (str): File name to load the conditional data from.
+
+    Returns:
+        pd.DataFrame: DataFrame containing the X, Y coordinates and the class of each sample.
     """
     print("[INFO] Loading TI", end="\r")
     return read_conditional_samples(filename)["D"].reshape(1, 150, 150)[0, :, :]
@@ -200,11 +213,12 @@ def load_conditional_data(filename: str) -> pd.DataFrame:
 
 def save_simulations(filename: str, num_realizations: int) -> None:
     """
-    Save simulations as numpy pickle.
+    Saves the simulations as a numpy pickle file.
 
-    :param filename: Name of the file with the desired simulations.
-    :param num_realizations: Number of realizations made to reshape accordingly.
-    """ 
+    Args:
+        filename (str): File name to save the simulations to.
+        num_realizations (int): Number of simulations performed to correctly reshape the data.
+    """
     print("[INFO] Loading simulations", end="\r")
     data = read_conditional_samples(filename)["D"]
     realizations = data[:, 0].reshape(num_realizations, 150, 150)

@@ -5,6 +5,7 @@ import yaml
 import time
 import torch
 import shutil
+import pathlib
 import torchvision
 import tensorboardX
 import torch.nn as nn
@@ -13,18 +14,14 @@ import torchvision.transforms as transforms
 from tqdm import tqdm
 from imageio import imsave
 from torch.autograd import grad
-from arch.models import CriticModel, GeneratorModel
 from torch.autograd import Variable
 from skimage.util import view_as_windows
+from arch.models import GeneratorModel, CriticModel
 
+# Constants
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-
-# Filtering warnings
-if not sys.warnoptions:
-    import warnings
-
-    warnings.simplefilter("ignore")
-
+CONFIG_FILE = "parameters.yaml"
+CHECKPOINT_FILENAME = "latest_checkpoint"
 
 def gradient_penalty(x, y, f):
     shape = [x.size(0)] + [1] * (x.dim() - 1)
@@ -45,11 +42,11 @@ def gradient_penalty(x, y, f):
 
 def save_checkpoint(state, save_path, is_best=True, max_keep=None):
     # save checkpoint
-    torch.save(state, save_path)
+    torch.save(state, f"{save_path}/Epoch.ckpt")
 
     # deal with max_keep
     save_dir = os.path.dirname(save_path)
-    list_path = os.path.join(save_dir, "latest_checkpoint")
+    list_path = os.path.join(save_dir, CHECKPOINT_FILENAME)
 
     save_path = os.path.basename(save_path)
     if os.path.exists(list_path):
@@ -71,16 +68,19 @@ def save_checkpoint(state, save_path, is_best=True, max_keep=None):
 
     # copy best
     if is_best:
-        shutil.copyfile(save_path, os.path.join(save_dir, "best_model.ckpt"))
-
+      shutil.copyfile("/workspace/checkpoints/Epoch.ckpt", os.path.join(save_dir, "best_model.ckpt"))
 
 def load_checkpoint(ckpt_dir_or_file, map_location=None, load_best=False):
     if os.path.isdir(ckpt_dir_or_file):
         if load_best:
             ckpt_path = os.path.join(ckpt_dir_or_file, "best_model.ckpt")
         else:
-            with open(os.path.join(ckpt_dir_or_file, "latest_checkpoint")) as f:
-                ckpt_path = os.path.join(ckpt_dir_or_file, f.readline()[:-1])
+            try:
+                with open(os.path.join(ckpt_dir_or_file, CHECKPOINT_FILENAME)) as f:
+                    ckpt_path = os.path.join(ckpt_dir_or_file, f.readline()[:-1])
+            except FileNotFoundError:
+                print("Checkpoint file not found. Starting training from scratch.")
+                return None
     else:
         ckpt_path = ckpt_dir_or_file
     ckpt = torch.load(ckpt_path, map_location=map_location)
@@ -89,18 +89,48 @@ def load_checkpoint(ckpt_dir_or_file, map_location=None, load_best=False):
 
 
 def config():
-    with open("parameters.yaml", "r") as stream:
+    config_file = pathlib.Path(CONFIG_FILE)
+    if not config_file.is_file():
+        print(f"Config file '{config_file}' not found!")
+        sys.exit(-1)
+
+    with config_file.open("r") as stream:
         try:
             parsed_yaml = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
-            print("Exception occured when opening .yaml config file!")
+            print("Error parsing .yaml config file!")
+            sys.exit(-1)
     return parsed_yaml
 
 
-""" Creating dataset of sliding patches on Strebelle TI"""
+def check_directory(directory: str) -> None:
+    """
+    Checks if a directory exists, if not, it creates it.
 
-"""Sliding through Strebelle TI and saving as image."""
+    Parameters
+    ----------
+    directory : str
+        Directory path.
+    """
+    pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
 
+
+def watch_for_checkpoints(args, Critic, Generator, critic_opt, gen_opt):
+    checkpoint = args["checkpoint"]
+    save_dir = args["sample_images"]
+
+    # Check and create paths if necessary
+    check_directory(checkpoint)
+    check_directory(save_dir)
+
+    # Loads checkpoint and changes state dictionary
+    ckpt = load_checkpoint(checkpoint)
+    start_epoch = ckpt["epoch"]
+    Critic.load_state_dict(ckpt["D"])
+    Generator.load_state_dict(ckpt["Generator"])
+    critic_opt.load_state_dict(ckpt["d_optimizer"])
+    gen_opt.load_state_dict(ckpt["g_optimizer"])
+    return start_epoch
 
 def generate_windows(
     training_image_path: str, args: dict, img_size: tuple = (128, 128), stride: int = 1
@@ -124,25 +154,17 @@ def generate_windows(
     windows : np.ndarray
         Array with batch size containing saved images.
     """
-    ti32 = cv2.imread(args["training_image"], cv2.COLOR_BGR2GRAY)
+    ti32 = cv2.imread(training_image_path, cv2.COLOR_BGR2GRAY)
 
     _, ti = cv2.threshold(ti32, 127, 255, cv2.THRESH_BINARY)
 
     windows = view_as_windows(ti, (150, 150))
     return windows
 
-
 def save_generated_images(windowed_images, args: dict) -> None:
-    """
-    Save each patch of Strebelle image to output directory.
+    output_dir = args['output_dir']
+    check_directory(output_dir)
 
-    Parameters
-    ----------
-    windowed_images : np.ndarray
-        Array of images.
-    args : dict
-        User defined parameters.
-    """
     for i, batch_ti in tqdm(
         enumerate(windowed_images),
         desc="Sliding window, please wait...",
@@ -153,74 +175,23 @@ def save_generated_images(windowed_images, args: dict) -> None:
             ti_resized = cv2.resize(t, (128, 128))
             imsave(f"{args['output_dir']}/strebelle_{i}_{j}.png", ti_resized)
 
-
-def watch_for_checkpoints(args, Critic, Generator, critic_opt, gen_opt):
-    """
-    Scan directories to see if there are checkpoints saved.
-
-    Parameters
-    ----------
-    args : argparse.args
-        Parameters defined for model training.
-    Critic : nn.Module
-        The Critic model to be loaded if any checkpoint is found.
-    Generator : nn.Module
-        The Critic model to be loaded if any checkpoint is found
-    critic_opt : torch.optim.Optimizer
-        PyTorch optimizer for the Critic model.
-    gen_opt : torch.optim.Optimizer
-        PyTorch optimizer for the Generator model.
-
-    Returns
-    -------
-    start_epoch : int
-        The epoch to resume the training, if no checkpoint is found, then
-        starts at epoch zero.
-    """
-    checkpoint = args["checkpoint"]
-    save_dir = args["sample_images"]
-
-    # Check if path exists
-    if not isinstance(checkpoint, (list, tuple)):
-        paths = [checkpoint]
-        for path in paths:
-            if not os.path.isdir(path):
-                os.makedirs(path)
-    if not isinstance(save_dir, (list, tuple)):
-        paths = [save_dir]
-        for path in paths:
-            if not os.path.isdir(path):
-                os.makedirs(path)
-    try:
-        # Loads checkpoint and changes state dictionary
-        ckpt = load_checkpoint(checkpoint)
-        start_epoch = ckpt["epoch"]
-        Critic.load_state_dict(ckpt["D"])
-        Generator.load_state_dict(ckpt["Generator"])
-        critic_opt.load_state_dict(ckpt["d_optimizer"])
-        gen_opt.load_state_dict(ckpt["g_optimizer"])
-    except FileNotFoundError:
-        print("[*] No checkpoint!")
-        start_epoch = 0
-
-    return start_epoch
-
+# Ignore warnings
+if not sys.warnoptions:
+    import warnings
+    warnings.simplefilter("ignore")
 
 def train(args) -> None:
-    """
-    Train both Generative and Critic model.
+    # Get paths from args
+    checkpoint_dir = args["checkpoint"]
+    sample_images_dir = args["sample_images"]
+    images_path = args["images_path"]
 
-    Parameters
-    ----------
-    args : argparse.args
-        Parameters defined for model training.
-    """
-    Critic = nn.DataParallel(CriticModel(args["num_channels"]))
-    Generator = nn.DataParallel(GeneratorModel(args["latent_dim"]))
-    Critic.to(DEVICE)
-    Generator.to(DEVICE)
-    Critic = CriticModel(args["num_channels"]).to(DEVICE, non_blocking=True)
-    Generator = GeneratorModel(args["latent_dim"]).to(DEVICE, non_blocking=True)
+    # Check and create paths if necessary
+    check_directory(checkpoint_dir)
+    check_directory(sample_images_dir)
+
+    Critic = nn.DataParallel(CriticModel(args["num_channels"])).to(DEVICE, non_blocking=True)
+    Generator = nn.DataParallel(GeneratorModel(args["latent_dim"])).to(DEVICE, non_blocking=True)
 
     # Instantiates optimizers
     G_opt = torch.optim.Adam(
@@ -230,18 +201,19 @@ def train(args) -> None:
         Critic.parameters(), lr=args["learning_rate"], betas=(0.5, 0.999)
     )
 
-    start_epoch = watch_for_checkpoints(args, Critic, Generator, C_opt, G_opt)
-
+    # start_epoch = watch_for_checkpoints(args, Critic, Generator, C_opt, G_opt)
+    start_epoch = 0
     # Loading Dataset
     transf = transforms.Compose(
         [
             transforms.ToTensor(),
             transforms.Grayscale(num_output_channels=1),
             transforms.Normalize([0.5], [0.5]),
+            transforms.Resize((256,256), antialias=True),
         ]
     )
 
-    writer = tensorboardX.SummaryWriter(".logs/wgan-gp")
+    writer = tensorboardX.SummaryWriter("logs/wgan-gp")
 
     data = torchvision.datasets.ImageFolder(args["images_path"], transform=transf)
     dataloader = torch.utils.data.DataLoader(
@@ -267,38 +239,43 @@ def train(args) -> None:
         gen_loss = []
         Generator.train()
 
-        # Sampling from dataloader
+        # For mixed precision training
+        scaler = torch.cuda.amp.GradScaler()
+
+        # In your training loop:
         for i, (images, _) in enumerate(dataloader):
             step = epoch * len(dataloader) + i + 1
-            images = Variable(images)
+            images = images.to(DEVICE, non_blocking=True)
             batch = images.size(0)
-
-            if args["cuda"]:
-                images = images.to(DEVICE, non_blocking=True)
-
-            # Creates random noise
             z = Variable(torch.randn(batch, args["latent_dim"]))
+            z = z.to(DEVICE, non_blocking=True)
 
-            if args["cuda"]:
-                z = z.to(DEVICE, non_blocking=True)
+            # Amp up the process for mixed precision
+            with torch.cuda.amp.autocast():
+                generated = Generator(z)
+                real_criticized = Critic(images)
+                fake_criticized = Critic(generated)
 
-            # Sends random noise to Generator and gets Critic output
-            generated = Generator(z)
-            real_criticized = Critic(images)
-            fake_criticized = Critic(generated)
+                em_distance = real_criticized.mean() - fake_criticized.mean()
+                grad_penalty = gradient_penalty(images.data, generated.data, Critic)
 
-            # Compare distance between critic output
-            em_distance = real_criticized.mean() - fake_criticized.mean()
-            grad_penalty = gradient_penalty(images.data, generated.data, Critic)
+                CriticLoss = -em_distance + grad_penalty * 10
 
-            # Calculates critic loss
-            CriticLoss = -em_distance + grad_penalty * 10
+            # Scales the loss, and calls backward() to create scaled gradients
+            scaler.scale(CriticLoss).backward()
 
-            # Append to list for logging purpose
-            critic_loss.append(CriticLoss.item())
+            # Unscales the gradients of optimizer's assigned params in-place, and checks for infs and nans
+            scaler.unscale_(C_opt)
+
+            # If the gradients do not contain infs or NaNs, optimizer.step() is then called,
+            # otherwise, optimizer.step() is skipped.
+            scaler.step(C_opt)
+
+            # Updates the scale for next iteration
+            scaler.update()
+
+            # Reset gradients
             Critic.zero_grad()
-            CriticLoss.backward()
-            C_opt.step()
 
             # Logs to tensorboard
             writer.add_scalar(
@@ -376,20 +353,17 @@ def train(args) -> None:
                 "d_optimizer": C_opt.state_dict(),
                 "g_optimizer": G_opt.state_dict(),
             },
-            "%s/Epoch_(%d).ckpt" % (args["checkpoint"], epoch + 1),
-            max_keep=5,
-        )
-
+            f'{args["checkpoint"]}')
 
 if __name__ == "__main__":
     # Get parameters
     param = config()
 
-    # Create necessary folders
-    os.makedirs(param["output_dir"], exist_ok=True)
-
-    if not os.path.exists(param["training_image"]):
-        raise FileNotFoundError("Could not find Strebelle training image in path!")
+    # Check for necessary files and directories
+    training_image = pathlib.Path(param["training_image"])
+    if not training_image.is_file():
+        print(f"Training image not found at path: '{training_image}'")
+        sys.exit(-1)
 
     print("Generating sliding windows, please wait...")
     windows = generate_windows(
@@ -398,7 +372,6 @@ if __name__ == "__main__":
 
     print("Saving all sliding windows...")
     save_generated_images(windows, param)
-    sys.exit(0)
 
     # Train the generative model
     train(param)

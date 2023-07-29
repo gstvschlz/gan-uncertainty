@@ -1,21 +1,10 @@
 import torch.nn as nn
 
-
 class GeneratorModel(nn.Module):
-    """
-    Generator model for WGAN-GP.
-
-    Given a vector of random values (latent inputs) as input, this network
-    generates data with the same structure as the training data.
-    The goal is to train the generator to generate data that "fools" the
-    Critic.
-    """
-
     def __init__(self, dim_in, dim: int = 128):
         super(GeneratorModel, self).__init__()
 
         def genblock(dim_in, dim_out):
-
             block = nn.Sequential(
                 nn.ConvTranspose2d(
                     in_channels=dim_in,
@@ -55,11 +44,11 @@ class GeneratorModel(nn.Module):
             genblock(dim * 16, dim * 8),
             genblock(dim * 8, dim * 4),
             genblock(dim * 4, dim * 2),
-            genimg(dim * 2),
+            genblock(dim * 2, dim),
+            genimg(dim),
         )
 
     def forward(self, x):
-        """Forward pass function."""
         x = self.prepare(x)
         x = x.view(x.size(0), -1, 4, 4)
         x = self.generate(x)
@@ -67,15 +56,6 @@ class GeneratorModel(nn.Module):
 
 
 class CriticModel(nn.Module):
-    """
-    Critic model for WGAN-GP.
-
-    Given batches of data containing observations from both the training data,
-    and generated data from the generator, this network attempts to classify
-    the observations as "real" or "generated".
-    The goal is to train the discriminator to distinguish between real and
-    generated data.
-    """
 
     def __init__(self, dim_in, dim=128):
         super(CriticModel, self).__init__()
@@ -102,11 +82,11 @@ class CriticModel(nn.Module):
             critic_block(dim, dim * 2),
             critic_block(dim * 2, dim * 4),
             critic_block(dim * 4, dim * 8),
-            nn.Conv2d(in_channels=dim * 8, out_channels=1, kernel_size=4),
+            critic_block(dim * 8, dim * 4),
+            nn.Conv2d(in_channels=dim * 4, out_channels=1, kernel_size=4),
         )
 
     def forward(self, x):
-        """Forward pass function."""
         x = self.analyze(x)
         x = x.view(-1)
         return x
