@@ -29,8 +29,8 @@ description = "Generate docs/*.gif (flags: names, --seed, --frames, --keys, --st
 run = "python scripts/gifs.py"
 
 [tasks.docs]
-description = "Build the Pages site (docs/)"
-run = "echo not implemented yet"
+description = "Verify the Pages site: links resolve, GIFs present, docs/ <= 5 MB"
+run = "python scripts/docs_check.py"
 
 [tasks.check]
 description = "compileall + catalog shape + facies-proportion assertion"
