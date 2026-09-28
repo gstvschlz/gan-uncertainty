@@ -3,28 +3,44 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f8f8f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#181915" media="(prefers-color-scheme: dark)">
 <title>Training Image Uncertainty</title>
 <meta name="description" content="A WGAN-GP generates a catalog of training images; each conditions one SNESIM realization. A re-run of Scholze, Bassani and Costa (2023).">
 <style>
+/* Tokens. Light is the primary look. Spec accent #83993e reached only 3.00:1 on bg
+   (2.76:1 on surface); darkened to #63732f (4.91:1 / 4.52:1) so it can carry link text. */
 :root {
-  --bg: #f7f4ec;
-  --ink: #1d1b18;
-  --muted: #625e55;
-  --rule: #d9d3c4;
-  --accent: #26345c;
-  --accent-ink: #f0c454;
+  --bg: #f8f8f7;
+  --surface: #eeefeb;
+  --ink: #1c1f14;
+  --muted: #616553;
+  --rule: #d3d6cd;
+  --accent: #63732f;
+  --accent-ink: #f8f8f7;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #14161d;
-    --ink: #ece8dd;
-    --muted: #a09b8e;
-    --rule: #2f3344;
-    --accent: #f0c454;
-    --accent-ink: #26345c;
+    --bg: #181915;
+    --surface: #23241e;
+    --ink: #eceee8;
+    --muted: #acafa1;
+    --rule: #3b3e33;
+    --accent: #c2d685;
+    --accent-ink: #181915;
     color-scheme: dark;
   }
+}
+:root[data-theme="dark"] {
+  --bg: #181915;
+  --surface: #23241e;
+  --ink: #eceee8;
+  --muted: #acafa1;
+  --rule: #3b3e33;
+  --accent: #c2d685;
+  --accent-ink: #181915;
+  color-scheme: dark;
 }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
@@ -32,64 +48,93 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 1.0625rem/1.6 Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font: 1rem/1.6 system-ui, "Segoe UI", sans-serif;
 }
-main, header, footer { max-width: 42rem; margin: 0 auto; padding: 0 16px; }
-header { padding-top: 3rem; }
-h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 .5rem; font-weight: 600; }
-h2 {
-  font-size: .8rem; letter-spacing: .12em; text-transform: uppercase;
-  font-weight: 600; color: var(--muted);
-  margin: 2.75rem 0 .75rem; padding-top: .75rem; border-top: 1px solid var(--rule);
+.page { max-width: 68rem; margin: 0 auto; padding: 0 16px; }
+
+/* title block */
+header { padding: 3rem 0 2rem; border-bottom: 1px solid var(--ink); }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .6rem; font-weight: 600; letter-spacing: -.01em; }
+.byline { color: var(--muted); margin: 0; max-width: 40rem; }
+
+/* two columns: summary left, body right */
+.paper { display: block; }
+h2 { font-size: 1.05rem; line-height: 1.3; font-weight: 600; margin: 2.5rem 0 .75rem; padding-top: .75rem; border-top: 1px solid var(--rule); }
+aside h2, main > section:first-child h2 { margin-top: 0; }
+aside { padding-top: 2rem; }
+aside h2 { margin-top: 0; border-top: 0; padding-top: 0; }
+aside p { font-size: .9375rem; color: var(--ink); }
+main { padding-top: 0; }
+main > section:first-child h2 { border-top: 0; padding-top: 0; }
+@media (min-width: 60rem) {
+  .paper { display: grid; grid-template-columns: 17rem minmax(0, 1fr); }
+  aside { padding: 2rem 2rem 2rem 0; border-right: 1px solid var(--rule); }
+  aside .sticky { position: sticky; top: 1.5rem; }
+  main { padding: 2rem 0 0 2.5rem; }
 }
-p { margin: 0 0 1rem; }
-.byline { color: var(--muted); margin: 0; }
+
+p { margin: 0 0 1rem; max-width: 42rem; }
 a { color: var(--accent); text-underline-offset: 2px; }
-a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 code, pre { font: .875rem/1.5 ui-monospace, "Cascadia Mono", Consolas, monospace; }
 pre {
-  margin: 0 0 1rem; padding: .75rem 1rem; overflow-x: auto;
-  border: 1px solid var(--rule); white-space: pre-wrap; word-break: break-word;
+  margin: 0 0 1rem; padding: .75rem 1rem; overflow-x: auto; max-width: 42rem;
+  border: 1px solid var(--rule); background: var(--surface); white-space: pre-wrap; word-break: break-word;
 }
+ul { padding-left: 1.2rem; margin: 0 0 1rem; max-width: 42rem; }
+li { margin-bottom: .5rem; }
+
+/* figures */
 figure { margin: 0; }
-figcaption { font-size: .9rem; color: var(--muted); margin-top: .4rem; }
+figcaption { font-size: .875rem; color: var(--muted); margin-top: .5rem; max-width: 42rem; }
+figcaption b { font-weight: 600; color: var(--ink); }
 .diagram { margin: 0 0 1rem; }
 .diagram svg { display: block; width: 100%; max-width: 30rem; height: auto; }
-.gifs { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+.gifs { display: grid; grid-template-columns: 1fr; gap: 1.75rem 1.5rem; }
 @media (min-width: 40rem) { .gifs { grid-template-columns: 1fr 1fr; } }
 .gifs img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
+
+/* table */
 .scroll { overflow-x: auto; margin: 0 0 .5rem; }
-table { border-collapse: collapse; width: 100%; font-size: .85rem; font-variant-numeric: tabular-nums; }
-.note { font-size: .9rem; color: var(--muted); }
-th, td { padding: .35rem .3rem; text-align: right; border-bottom: 1px solid var(--rule); }
-th:first-child, td:first-child { text-align: left; padding-left: 0; }
-thead th { font-weight: 600; border-bottom-color: var(--ink); }
-ul { padding-left: 1.2rem; margin: 0 0 1rem; }
-li { margin-bottom: .5rem; }
-footer { padding-top: 1rem; padding-bottom: 3rem; color: var(--muted); font-size: .9rem; }
+table { border-collapse: collapse; width: 100%; font-size: .875rem; font-variant-numeric: tabular-nums; }
+th, td { padding: .4rem .5rem; text-align: right; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; padding-left: 0; white-space: normal; }
+thead th { font-weight: 600; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+tbody tr:last-child td { border-bottom: 1px solid var(--ink); }
+.note { font-size: .875rem; color: var(--muted); }
+.note b { font-weight: 600; color: var(--ink); }
+
+footer { margin-top: 3rem; padding: 1rem 0 3rem; border-top: 1px solid var(--rule); color: var(--muted); font-size: .875rem; }
 
 /* diagram colours follow the page theme */
 .box { fill: none; stroke: var(--ink); stroke-width: 1.5; }
 .proc { fill: var(--accent); stroke: var(--accent); stroke-width: 1.5; }
-.t { fill: var(--ink); font: 15px Georgia, serif; text-anchor: middle; }
-.tp { fill: var(--accent-ink); font: 15px Georgia, serif; text-anchor: middle; }
-.ts { fill: var(--muted); font: 13px Georgia, serif; text-anchor: middle; }
+.t { fill: var(--ink); font: 15px system-ui, "Segoe UI", sans-serif; text-anchor: middle; }
+.tp { fill: var(--accent-ink); font: 15px system-ui, "Segoe UI", sans-serif; text-anchor: middle; }
+.ts { fill: var(--muted); font: 13px system-ui, "Segoe UI", sans-serif; text-anchor: middle; }
 .arr { fill: none; stroke: var(--muted); stroke-width: 1.5; }
 .head { fill: var(--muted); }
 </style>
 </head>
 <body>
+<div class="page">
 <header>
   <h1>Training Image Uncertainty</h1>
   <p class="byline">A WGAN-GP catalog of training images for SNESIM, re-run from the code of Scholze, Bassani and Costa (2023).</p>
 </header>
-<main>
 
-<h2>Summary</h2>
+<div class="paper">
+<aside aria-labelledby="summary">
+<div class="sticky">
+<h2 id="summary">Summary</h2>
 <p>Multiple-point statistics (MPS) simulation reproduces curvilinear geology, such as fluvial channels, by copying patterns from a training image (TI). Most workflows draw every realization from a single TI. That TI is one interpretation of the geology, so the realizations leave out the uncertainty about the TI itself and understate spatial uncertainty.</p>
 <p>This project trains a WGAN-GP on Strebelle's 250x250 channel TI. The trained generator samples a catalog of TIs, and each catalog TI conditions one SNESIM realization. Running SNESIM from the single reference TI gives the baseline. Both workflows condition on the same well data.</p>
 <p>The paper concludes that the catalog workflow yields higher uncertainty and variability. The re-run below, made with this repository's code, agrees in direction with a small margin.</p>
+</div>
+</aside>
 
+<main>
+<section>
 <h2>Workflow</h2>
 <figure class="diagram">
 <svg viewBox="0 0 460 350" role="img" aria-labelledby="dg-t dg-d">
@@ -128,33 +173,37 @@ footer { padding-top: 1rem; padding-bottom: 3rem; color: var(--muted); font-size
   <rect class="box" x="240" y="302" width="180" height="40"/>
   <text class="t" x="330" y="328">Realizations</text>
 </svg>
-<figcaption>Baseline (left) and proposed (right) workflows. Wells enter SNESIM in both.</figcaption>
+<figcaption><b>Figure 1.</b> Baseline (left) and proposed (right) workflows. Wells enter SNESIM in both.</figcaption>
 </figure>
+</section>
 
+<section>
 <h2>Animations</h2>
 <div class="gifs">
   <figure>
     <img src="ti-latent-walk.gif" width="430" height="274" alt="A path through the generator's latent space produces a sequence of channel-network images, shown beside the reference TI." loading="lazy">
-    <figcaption>A path through the generator's latent space, with the reference TI alongside.</figcaption>
+    <figcaption><b>Figure 2.</b> A path through the generator's latent space, with the reference TI alongside.</figcaption>
   </figure>
   <figure>
     <img src="ti-catalog.gif" width="430" height="274" alt="A flipbook of catalog TIs in sand yellow and mud navy, each labelled with its sand proportion." loading="lazy">
-    <figcaption>A flipbook of catalog TIs, each labelled with its sand proportion.</figcaption>
+    <figcaption><b>Figure 3.</b> A flipbook of catalog TIs, each labelled with its sand proportion.</figcaption>
   </figure>
   <figure>
     <img src="training-progression.gif" width="550" height="334" alt="Four generated tiles from fixed latent vectors at each saved epoch, beside the reference TI. Early tiles are noisy; the last ones show channel networks, some still grainy." loading="lazy">
-    <figcaption>The same four latent vectors at each saved epoch, beside the reference TI. At epoch 50 some tiles are clean channel networks and others stay grainy.</figcaption>
+    <figcaption><b>Figure 4.</b> The same four latent vectors at each saved epoch, beside the reference TI. At epoch 50 some tiles are clean channel networks and others stay grainy.</figcaption>
   </figure>
   <figure>
     <img src="realizations.gif" width="430" height="366" alt="Single-TI baseline realizations on the left and GAN-catalog realizations on the right, with histograms of sand proportion that fill as realizations accumulate." loading="lazy">
-    <figcaption>Baseline and catalog realizations side by side, with histograms of sand proportion that fill as realizations accumulate.</figcaption>
+    <figcaption><b>Figure 5.</b> Baseline and catalog realizations side by side, with histograms of sand proportion that fill as realizations accumulate.</figcaption>
   </figure>
 </div>
+</section>
 
+<section>
 <h2>Results</h2>
 <div class="scroll">
 <table>
-  <thead><tr><th>Set</th><th>n</th><th>Mean</th><th>Std</th><th>Min</th><th>Max</th></tr></thead>
+  <thead><tr><th scope="col">Set</th><th scope="col">n</th><th scope="col">Mean</th><th scope="col">Std</th><th scope="col">Min</th><th scope="col">Max</th></tr></thead>
   <tbody>
     <tr><td>Reference TI</td><td>1</td><td>0.2674</td><td></td><td></td><td></td></tr>
     <tr><td>Catalog TIs</td><td>100</td><td>0.3020</td><td></td><td>0.139</td><td>0.385</td></tr>
@@ -163,10 +212,12 @@ footer { padding-top: 1rem; padding-bottom: 3rem; color: var(--muted); font-size
   </tbody>
 </table>
 </div>
-<p class="note">Sand proportion in this repository's re-run (seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per workflow). These are not the paper's figures.</p>
+<p class="note"><b>Table 1.</b> Sand proportion in this repository's re-run (seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per workflow). These are not the paper's figures.</p>
 <p>78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread slightly more than the baseline (std 0.0300 against 0.0280).</p>
 <p>The generator is under-trained relative to the paper. The critic loss had not levelled off at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on well data is expected to shift them; this run did not test that. The two workflows also differ in TI size: the baseline uses the full 250x250 reference, and each catalog TI is 150x150, the window size the generator trains on.</p>
+</section>
 
+<section>
 <h2>Reproduce</h2>
 <p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require; the code falls back to the CPU. On the GPU, 50 epochs take about 2 h; on a CPU, 5 epochs would take an estimated 10 h. SNESIM runs through <code>snesim.exe</code>, so that step needs Windows. Nothing pretrained ships, so every artifact regenerates.</p>
 <pre>mise run setup    # .venv and dependencies
@@ -176,14 +227,18 @@ mise run snesim   # realizations plus the single-TI baseline
 mise run gifs     # docs/*.gif
 mise run check    # shape and facies-proportion assertions</pre>
 <p>The <code>train</code>, <code>sample</code>, <code>snesim</code> and <code>gifs</code> tasks take <code>--seed</code> (default 69096). Run <code>mise run &lt;task&gt; -- --help</code> for the flags.</p>
+</section>
 
+<section>
 <h2>Differences from the 2022 code</h2>
 <ul>
   <li>The generator output is binarised at 0 instead of 0.5. For a 5-epoch generator, 0 gives a catalog sand proportion of 0.264 against 0.267 for the reference; 0.5 gave 0.19.</li>
   <li>The SSIM &ge; 0.9 filter in sampling is gone. A dtype bug meant it never filtered, and the SSIM between independent TIs is at most about 0.3.</li>
   <li>The TI file is <code>strebelle.out</code>, renamed from <code>ti_strebelle.out</code> because <code>snesim.exe</code> rejects file names over 30 characters.</li>
 </ul>
+</section>
 
+<section>
 <h2>Cite</h2>
 <pre>@article{scholze2023gan,
   author  = {Scholze, Gustavo Pretto and Bassani, Marcel Antonio Arcari and Costa, Jo{\~a}o Felipe Coimbra Leite},
@@ -194,13 +249,19 @@ mise run check    # shape and facies-proportion assertions</pre>
   year    = {2023},
   doi     = {10.1016/j.geoen.2023.212257}
 }</pre>
+</section>
 
+<section>
 <h2>Links</h2>
 <ul>
   <li><a href="https://doi.org/10.1016/j.geoen.2023.212257">Paper, Geoenergy Science and Engineering 230, 212257</a></li>
   <li><a href="https://github.com/gstvschlz/gan-uncertainty">Repository on GitHub</a> (GNU GPL v3)</li>
 </ul>
+</section>
 </main>
+</div>
+
 <footer>SNESIM: Strebelle (2002); open implementation: Remy et al. (2009).</footer>
+</div>
 </body>
 </html>
