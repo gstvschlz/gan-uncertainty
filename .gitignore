@@ -164,6 +164,7 @@ strebelle*.png
 *.4
 .ipynb
 .*
+!docs/.nojekyll
 
 # Regenerated artifacts (fetch or rebuild with mise)
 outputs/
