@@ -1,83 +1,69 @@
-<h1 align="center">
-   Use of Generative Adversarial Networks to incorporate the Training Image Uncertainty in Multiple-Point Statistics Simulation
-</h1>
+# gan-uncertainty
 
-  <p align="center">
-  <a href="#objective">Objective</a> •
-  <a href="#results">Results</a> •
-  <a href="#usage">Usage</a> •
-  </p>
+Code to reproduce the workflow of Scholze, Bassani and Costa (2023), *Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation*, Geoenergy Science and Engineering 230, 212257. Paper: <https://doi.org/10.1016/j.geoen.2023.212257>.
 
-  <h2 id="objective" > 🎯 Objectives </h2>
+Multiple-point statistics (MPS) simulations usually draw every realization from one training image (TI), so the uncertainty about the TI itself is ignored and spatial uncertainty is understated. Here a WGAN-GP learns the patterns of a reference TI (Strebelle's 250x250 fluvial channels) and samples a catalog of TIs. Each catalog TI conditions one SNESIM realization, and SNESIM still honours the well data. Realizations from the single reference TI form the baseline. The paper concludes that the catalog workflow gives higher uncertainty and variability. This re-run agrees in direction, with a small margin (see Results).
 
-Multiple-Point Geostatistical (MPS) methods have been successfully applied to build numerical models with curvilinear features using several sources of information. Even though traditional algorithms reproduce the spatial pattern of the variogram models, they fail describing curvilinear features - which came from a conceptual model of the underlying geology provided by the expert geologist.  *However, there is hope - MPS new methods reproduces these patterns we wish to replicate.*
+| Latent walk | TI catalog |
+|---|---|
+| ![Slerp path through the generator's latent space next to the reference TI](docs/ti-latent-walk.gif) | ![Flipbook of catalog TIs with their sand proportions](docs/ti-catalog.gif) |
+| A path through the latent space, with the reference TI alongside. | Catalog TIs, each labelled with its sand proportion. |
 
-In this work, we chose the SNESIM algorithm (Strebelle, 2002) for three reasons: (a) because it is a method widely used by the community; (b) its parameters are intuitive and interpretable; (c) SNESIM algorithm is freely available (Remy and Boucher, 2009).
+| Training | Realizations |
+|---|---|
+| ![Four fixed latent vectors rendered at each saved epoch, beside the reference TI](docs/training-progression.gif) | ![Baseline and catalog realizations with running histograms of sand proportion](docs/realizations.gif) |
+| The same four latents at each saved epoch. | Baseline (left) and catalog (right) realizations, with running histograms. |
 
-The training image is uncertain as the actual spatial pattern is unknown. 
-This uncertainty is even more pronounced at the exploration stage when little information is available (Pyrcz and Deutsch, 2014). Considering the uncertainty of the input parameters improves the assessment of the space of uncertainty, Pyrcz and Deutsch (2014) recommend using a scenario-based approach to incorporate the lack of confidence of the parameters in the simulations.
+## Results (this repo's re-run, not the paper's figures)
 
-The idea is to merge the generative model adeptness to learn spatial patterns with the benefits of the SNESIM algorithm to use many types of information for conditioning. The outcome is a hybrid workflow with two main steps: (a) creating a dataset of training images using the generative model; (b) building geostatistical models using the synthetic TI and the existing conditional data.
+Seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per workflow. Sand proportion:
 
-<h2 id="results" > Results and discussion</h2>
+| Set | n | Mean | Std | Min | Max |
+|---|---|---|---|---|---|
+| Reference TI | 1 | 0.2674 | | | |
+| Catalog TIs | 100 | 0.3020 | | 0.139 | 0.385 |
+| Realizations, single TI (baseline) | 100 | 0.3467 | 0.0280 | 0.2896 | 0.4107 |
+| Realizations, GAN catalog | 100 | 0.3419 | 0.0300 | 0.2767 | 0.4288 |
 
-  
-<h3 id="usage" > 👷 Usage </h2>
+78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread only slightly more than the baseline. The generator is under-trained relative to the paper: the critic loss was still falling at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on hard data is expected to shift them; this run did not test that.
 
-Pre-requisites to run the script included in the `requirements.txt` file .
+## Reproduce
 
-  ```shell
-  git clone https://github.com/algocompretto/gan-uncertainty.git
-  
-  # Activates the environment and installs prerequisites
-  cd gan-uncertainty/ && python3 -m venv .venv
-  source .venv/bin/activate
-  pip install -r requirements.txt
-  ```
-<br><br>
+Needs [mise](https://mise.jdx.dev). It installs Python 3.11. `setup` builds `.venv` and installs torch 2.11 from the CUDA 12.8 wheel index (required by RTX 50-series GPUs; the code falls back to the CPU). Nothing pretrained ships; every artifact regenerates. The SNESIM step needs Windows (`snesim.exe`).
 
-<h3 id="usage-snesim" > Running SNESIM simulations </h3>
-In the project folder, navigate to the `SNESIM` folder, and then execute the script with:
-
-  ```shell
-  python3 snesim.py --arguments
-  ```
-
-| Argument name    | Description                                                                                    |
-| ---------------- | ---------------------------------------------------------------------------------------------- |
-| `--samples_path` | The samples path. The file should contain data in the following format: `x`,`y`,`z`,`facies` . |
-| `--ti_path `     | The training image path in GSLIB format.                                                       |
-| `--par_path`     | Path to the parameter file with all information related to the simulation process itself.      |
-| `--exe_path`     | The `snesim.exe` file path.                                                                    |
-| `--output_path`  | Path to the output file.                                                                       |
-| `--realizations` | Number of realizations to be done.                                                             |
-| `--max_cond`     | The maximum amount of points to use in the conditioning process.                               |
-| `--min_cond`     | The minimum amount of points to use in the conditioning process.                               |
-| `--seed`         | The initial seed for the simulation.                                                           |
-| `--plot`         | A boolean value for whether you want to plot/save the results or not.                          |
-
-<h2 id="usage-gan" > Running the proposed workflow </h3>
-<h3>Training</h4>
-If you wish to train a new model on unseen data, you can follow the next steps:
-
-```shell
-cd generative_model/
-python3 gan.py
 ```
-The training will get all the information on hyperparameters from the `parameters.yaml` file
+mise run setup    # .venv and dependencies
+mise run train    # WGAN-GP; 50 epochs take about 2 h on a GPU (5 epochs: about 10 h on a CPU)
+mise run sample   # the TI catalog, into outputs/
+mise run snesim   # one realization per catalog TI, plus the single-TI baseline
+mise run gifs     # docs/*.gif
+mise run check    # compile, catalog shape, facies-proportion assertion
+```
 
-| Argument name    | Description                                                                    |
-| ---------------- | ------------------------------------------------------------------------------ |
-| `output_dir`     | The output directory for the augmented images.                                 |
-| `training_image` | The training image path in `.png` format.                                      |
-| `checkpoint`     | The checkpoint folder which the models will be stored.                         |
-| `sample_images`  | The folder where the sampled examples from the network will be saved.          |
-| `num_channels`   | Number of channels in the image                                                |
-| `latent_dim`     | The latent dimension vector size representing the features.                    |
-| `learning_rate`  | The learning rate for the Adam optimizers                                      |
-| `images_path`    | The output directory for the windowed images.                                  |
-| `batch_size`     | The batch size for the training step.                                          |
-| `num_workers`    | The number of workers to load the dataset.                                     |
-| `num_epochs`     | The number of epochs for training step.                                        |
-| `cuda`           | A boolean value for whether you want to use the CUDA device or not.            |
-| `n_critic`       | The number of steps to train the Critic after `n` iterations of the Generator. |
+`mise run figures` writes the figure set, `mise run docs` verifies the project page, and `mise run all` chains everything. Every stochastic step takes `--seed` (default 69096); run `mise run <task> -- --help` for the flags.
+
+## Differences from the 2022 code
+
+- The generator output is binarised at 0 instead of 0.5. For a 5-epoch generator, 0 gives a catalog sand proportion of 0.264 against 0.267 for the reference; 0.5 gave 0.19.
+- The SSIM >= 0.9 filter in sampling is gone. A dtype bug meant it never filtered, and the SSIM between independent TIs is at most about 0.3.
+- The TI file is `strebelle.out`, renamed from `ti_strebelle.out` because `snesim.exe` rejects file names over 30 characters.
+
+## Cite
+
+```bibtex
+@article{scholze2023gan,
+  author  = {Scholze, Gustavo Pretto and Bassani, Marcel Antonio Arcari and Costa, Jo{\~a}o Felipe Coimbra Leite},
+  title   = {Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation},
+  journal = {Geoenergy Science and Engineering},
+  volume  = {230},
+  pages   = {212257},
+  year    = {2023},
+  doi     = {10.1016/j.geoen.2023.212257}
+}
+```
+
+`CITATION.cff` carries the same reference for GitHub's "Cite this repository". SNESIM: Strebelle (2002); open implementation: Remy et al. (2009).
+
+## Licence
+
+GNU General Public License v3, see `COPYING.txt`.
