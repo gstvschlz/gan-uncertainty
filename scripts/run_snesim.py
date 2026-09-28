@@ -13,7 +13,9 @@ sys.path.insert(0, "src/snesim")
 import snesim  # noqa: E402
 
 
-def simulate(name: str, out_dir: str, ti_path: str, ti_dim: int, n: int, seed: int) -> np.ndarray:
+def simulate(
+    name: str, out_dir: str, ti_path: str, ti_dim: int, n: int, seed: int
+) -> np.ndarray:
     """Run snesim.exe once; returns the realizations as (n, 150, 150)."""
     os.makedirs(out_dir, exist_ok=True)
     args = argparse.Namespace(
@@ -36,16 +38,28 @@ def simulate(name: str, out_dir: str, ti_path: str, ti_dim: int, n: int, seed: i
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--realizations", type=int, default=100, help="Baseline realizations")
+    parser.add_argument(
+        "--realizations", type=int, default=100, help="Baseline realizations"
+    )
     parser.add_argument("--n", type=int, help="Use only the first n catalog TIs")
     parser.add_argument("--seed", type=int, default=69096)
     args = parser.parse_args()
 
     # Traditional workflow: N realizations from the single reference TI.
-    simulate("snesim", "outputs/snesim", "src/snesim/data/strebelle.out", 250, args.realizations, args.seed)
+    simulate(
+        "snesim",
+        "outputs/snesim",
+        "src/snesim/data/strebelle.out",
+        250,
+        args.realizations,
+        args.seed,
+    )
 
     # Proposed workflow: catalog TI i conditions realization i (seed + i).
-    tis = sorted(Path("outputs/catalog").glob("ti_*.out"), key=lambda p: int(re.findall(r"\d+", p.stem)[0]))
+    tis = sorted(
+        Path("outputs/catalog").glob("ti_*.out"),
+        key=lambda p: int(re.findall(r"\d+", p.stem)[0]),
+    )
     if not tis:
         raise SystemExit("No catalog in outputs/catalog: run `mise run sample` first.")
     tis = tis[: args.n]
@@ -54,4 +68,6 @@ if __name__ == "__main__":
         for i, ti in enumerate(tis)
     ]
     np.save("outputs/gan/gan.npy", np.stack(gan))
-    print(f"Baseline: {args.realizations} realizations; catalog: {len(gan)} realizations")
+    print(
+        f"Baseline: {args.realizations} realizations; catalog: {len(gan)} realizations"
+    )

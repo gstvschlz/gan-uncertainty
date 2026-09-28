@@ -34,7 +34,9 @@ if not CATALOG.exists():
     sys.exit(0)
 
 catalog = np.load(CATALOG)
-assert catalog.ndim == 3 and catalog.shape[1:] == ref.shape, f"bad shape {catalog.shape}"
+assert (
+    catalog.ndim == 3 and catalog.shape[1:] == ref.shape
+), f"bad shape {catalog.shape}"
 assert set(np.unique(catalog)) <= {0, 1}, "catalog is not binary"
 
 props = catalog.mean(axis=(1, 2))
@@ -42,6 +44,10 @@ print(
     f"catalog {catalog.shape}: mean sand proportion {props.mean():.4f} "
     f"(min {props.min():.4f}, max {props.max():.4f})"
 )
-assert abs(props.mean() - ref_p) <= tol, f"catalog mean off reference by more than {tol}"
-assert np.abs(props - ref_p).max() <= 2 * tol, f"a TI is off reference by more than {2 * tol}"
+assert (
+    abs(props.mean() - ref_p) <= tol
+), f"catalog mean off reference by more than {tol}"
+assert (
+    np.abs(props - ref_p).max() <= 2 * tol
+), f"a TI is off reference by more than {2 * tol}"
 print("OK")
