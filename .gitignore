@@ -164,3 +164,12 @@ strebelle*.png
 *.4
 .ipynb
 .*
+
+# Regenerated artifacts (fetch or rebuild with mise)
+outputs/
+checkpoints/
+*.pth
+*.npy
+*.out
+!src/snesim/data/ti_strebelle.out
+.venv/
