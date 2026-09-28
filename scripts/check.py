@@ -3,8 +3,9 @@
 The catalog must be (N, 250, 250) binary, and its sand proportion must match the
 reference TI. Tolerances come from the reference itself: the generator is trained on
 150x150 windows of it, whose sand proportion deviates from the full-TI value by at
-most ~0.05 (measured below), so the catalog mean must lie within 0.05 and no single
-TI may drift beyond twice that. Skips cleanly when no catalog exists yet.
+most ~0.05 (measured below), so the catalog mean must lie within that tolerance. The
+spread of individual TIs is reported, not asserted: it is the uncertainty being studied.
+Skips cleanly when no catalog exists yet.
 """
 
 import subprocess
@@ -47,7 +48,4 @@ print(
 assert (
     abs(props.mean() - ref_p) <= tol
 ), f"catalog mean off reference by more than {tol}"
-assert (
-    np.abs(props - ref_p).max() <= 2 * tol
-), f"a TI is off reference by more than {2 * tol}"
 print("OK")
