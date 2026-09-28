@@ -1,5 +1,5 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
-torch==2.11.0  # WGAN-GP; the cu128 wheel is needed for Blackwell GPUs and falls back to CPU
+torch==2.13.0  # WGAN-GP; the cu128 wheel is needed for Blackwell GPUs and falls back to CPU
 torchvision==0.26.0  # training dataset and image grids
 numpy==2.4.6  # arrays, GSLIB grids
 pandas==3.0.6  # figures: tables of realizations
