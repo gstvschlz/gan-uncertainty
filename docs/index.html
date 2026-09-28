@@ -86,8 +86,8 @@ footer { padding-top: 1rem; padding-bottom: 3rem; color: var(--muted); font-size
 <main>
 
 <h2>Summary</h2>
-<p>Multiple-point statistics (MPS) simulation reproduces curvilinear geology, such as fluvial channels, by copying patterns from a training image (TI). Most studies draw every realization from a single TI. That TI is one interpretation of the geology, so the realizations leave out the uncertainty about the TI itself and understate spatial uncertainty.</p>
-<p>This project trains a WGAN-GP on Strebelle's 250x250 channel TI. The trained generator samples a catalog of TIs, and each catalog TI conditions one SNESIM realization. SNESIM still handles the well data. Running SNESIM from the single reference TI gives the baseline.</p>
+<p>Multiple-point statistics (MPS) simulation reproduces curvilinear geology, such as fluvial channels, by copying patterns from a training image (TI). Most workflows draw every realization from a single TI. That TI is one interpretation of the geology, so the realizations leave out the uncertainty about the TI itself and understate spatial uncertainty.</p>
+<p>This project trains a WGAN-GP on Strebelle's 250x250 channel TI. The trained generator samples a catalog of TIs, and each catalog TI conditions one SNESIM realization. Running SNESIM from the single reference TI gives the baseline. Both workflows condition on the same well data.</p>
 <p>The paper concludes that the catalog workflow yields higher uncertainty and variability. The re-run below, made with this repository's code, agrees in direction with a small margin.</p>
 
 <h2>Workflow</h2>
@@ -164,18 +164,18 @@ footer { padding-top: 1rem; padding-bottom: 3rem; color: var(--muted); font-size
 </table>
 </div>
 <p class="note">Sand proportion in this repository's re-run (seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per workflow). These are not the paper's figures.</p>
-<p>78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread only slightly more than the baseline (std 0.0300 against 0.0280).</p>
-<p>The generator is under-trained relative to the paper. The critic loss was still falling at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on hard data is expected to shift them; this run did not test that.</p>
+<p>78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread slightly more than the baseline (std 0.0300 against 0.0280).</p>
+<p>The generator is under-trained relative to the paper. The critic loss had not levelled off at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on well data is expected to shift them; this run did not test that. The two workflows also differ in TI size: the baseline uses the full 250x250 reference, and each catalog TI is 150x150, the window size the generator trains on.</p>
 
 <h2>Reproduce</h2>
-<p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require; the code falls back to the CPU. On the GPU, 50 epochs take about 2 h; on a CPU, 5 epochs take about 10 h. SNESIM runs through <code>snesim.exe</code>, so that step needs Windows. Nothing pretrained ships, so every artifact regenerates.</p>
+<p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require; the code falls back to the CPU. On the GPU, 50 epochs take about 2 h; on a CPU, 5 epochs would take an estimated 10 h. SNESIM runs through <code>snesim.exe</code>, so that step needs Windows. Nothing pretrained ships, so every artifact regenerates.</p>
 <pre>mise run setup    # .venv and dependencies
 mise run train    # WGAN-GP
 mise run sample   # the TI catalog
 mise run snesim   # realizations plus the single-TI baseline
 mise run gifs     # docs/*.gif
 mise run check    # shape and facies-proportion assertions</pre>
-<p>Every stochastic step takes <code>--seed</code> (default 69096). Run <code>mise run &lt;task&gt; -- --help</code> for the flags.</p>
+<p>The <code>train</code>, <code>sample</code>, <code>snesim</code> and <code>gifs</code> tasks take <code>--seed</code> (default 69096). Run <code>mise run &lt;task&gt; -- --help</code> for the flags.</p>
 
 <h2>Differences from the 2022 code</h2>
 <ul>

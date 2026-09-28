@@ -17,7 +17,7 @@ description = "Generate the TI catalog into outputs/ (flags: --num_samples --see
 run = "python src/generative_model/sampling.py"
 
 [tasks.snesim]
-description = "Single-TI baseline plus one SNESIM realization per catalog TI (Windows: snesim.exe; elsewhere: wine)"
+description = "Single-TI baseline plus one SNESIM realization per catalog TI (Windows: snesim.exe; wine fallback untested)"
 run = "python scripts/run_snesim.py"
 
 [tasks.figures]

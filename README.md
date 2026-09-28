@@ -2,7 +2,7 @@
 
 Code to reproduce the workflow of Scholze, Bassani and Costa (2023), *Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation*, Geoenergy Science and Engineering 230, 212257. Paper: <https://doi.org/10.1016/j.geoen.2023.212257>.
 
-Multiple-point statistics (MPS) simulations usually draw every realization from one training image (TI), so the uncertainty about the TI itself is ignored and spatial uncertainty is understated. Here a WGAN-GP learns the patterns of a reference TI (Strebelle's 250x250 fluvial channels) and samples a catalog of TIs. Each catalog TI conditions one SNESIM realization, and SNESIM still honours the well data. Realizations from the single reference TI form the baseline. The paper concludes that the catalog workflow gives higher uncertainty and variability. This re-run agrees in direction, with a small margin (see Results).
+Most multiple-point statistics (MPS) workflows draw every realization from one training image (TI), so the uncertainty about the TI itself is ignored and spatial uncertainty is understated. Here a WGAN-GP learns the patterns of a reference TI (Strebelle's 250x250 fluvial channels) and samples a catalog of TIs. Each catalog TI conditions one SNESIM realization. Realizations from the single reference TI form the baseline, and both workflows condition on the same well data (`samples50`). The paper concludes that the catalog workflow gives higher uncertainty and variability. This re-run agrees in direction, with a small margin (see Results).
 
 | Latent walk | TI catalog |
 |---|---|
@@ -25,7 +25,7 @@ Seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per work
 | Realizations, single TI (baseline) | 100 | 0.3467 | 0.0280 | 0.2896 | 0.4107 |
 | Realizations, GAN catalog | 100 | 0.3419 | 0.0300 | 0.2767 | 0.4288 |
 
-78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread only slightly more than the baseline. The generator is under-trained relative to the paper: the critic loss was still falling at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on hard data is expected to shift them; this run did not test that.
+78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread slightly more than the baseline (std 0.0300 against 0.0280). The generator is under-trained relative to the paper: the critic loss had not levelled off at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on well data is expected to shift them; this run did not test that. The two workflows also differ in TI size: the baseline uses the full 250x250 reference, and each catalog TI is 150x150, the window size the generator trains on.
 
 ## Reproduce
 
@@ -33,14 +33,14 @@ Needs [mise](https://mise.jdx.dev). It installs Python 3.11. `setup` builds `.ve
 
 ```
 mise run setup    # .venv and dependencies
-mise run train    # WGAN-GP; 50 epochs take about 2 h on a GPU (5 epochs: about 10 h on a CPU)
+mise run train    # WGAN-GP; 50 epochs take about 2 h on a GPU (5 epochs on a CPU: an estimated 10 h)
 mise run sample   # the TI catalog, into outputs/
 mise run snesim   # one realization per catalog TI, plus the single-TI baseline
 mise run gifs     # docs/*.gif
 mise run check    # compile, catalog shape, facies-proportion assertion
 ```
 
-`mise run figures` writes the figure set, `mise run docs` verifies the project page, and `mise run all` chains everything. Every stochastic step takes `--seed` (default 69096); run `mise run <task> -- --help` for the flags.
+`mise run figures` writes the figure set, `mise run docs` verifies the project page, and `mise run all` chains everything. `train`, `sample`, `snesim` and `gifs` take `--seed` (default 69096); run `mise run <task> -- --help` for the flags.
 
 ## Differences from the 2022 code
 
