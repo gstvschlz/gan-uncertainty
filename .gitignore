@@ -171,5 +171,5 @@ checkpoints/
 *.pth
 *.npy
 *.out
-!src/snesim/data/ti_strebelle.out
+!src/snesim/data/strebelle.out
 .venv/

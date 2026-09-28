@@ -1,4 +1,5 @@
 import os
+import argparse
 import cv2
 import sys
 import yaml
@@ -12,7 +13,6 @@ import torch.nn as nn
 import torchvision.transforms as transforms
 
 from tqdm import tqdm
-from imageio import imsave
 from torch.autograd import grad
 from torch.autograd import Variable
 from skimage.util import view_as_windows
@@ -20,7 +20,7 @@ from arch.models import GeneratorModel, CriticModel
 
 # Constants
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-CONFIG_FILE = "parameters.yaml"
+CONFIG_FILE = pathlib.Path(__file__).with_name("parameters.yaml")
 CHECKPOINT_FILENAME = "latest_checkpoint"
 
 def gradient_penalty(x, y, f):
@@ -66,9 +66,6 @@ def save_checkpoint(state, save_path, is_best=True, max_keep=None):
     with open(list_path, "w") as f:
         f.writelines(ckpt_list)
 
-    # copy best
-    if is_best:
-      shutil.copyfile("/workspace/checkpoints/Epoch.ckpt", os.path.join(save_dir, "best_model.ckpt"))
 
 def load_checkpoint(ckpt_dir_or_file, map_location=None, load_best=False):
     if os.path.isdir(ckpt_dir_or_file):
@@ -173,7 +170,7 @@ def save_generated_images(windowed_images, args: dict) -> None:
     ):
         for j, t in enumerate(batch_ti):
             ti_resized = cv2.resize(t, (128, 128))
-            imsave(f"{args['output_dir']}/strebelle_{i}_{j}.png", ti_resized)
+            cv2.imwrite(f"{args['output_dir']}/strebelle_{i}_{j}.png", ti_resized)
 
 # Ignore warnings
 if not sys.warnoptions:
@@ -213,7 +210,7 @@ def train(args) -> None:
         ]
     )
 
-    writer = tensorboardX.SummaryWriter("logs/wgan-gp")
+    writer = tensorboardX.SummaryWriter("outputs/logs/wgan-gp")
 
     data = torchvision.datasets.ImageFolder(args["images_path"], transform=transf)
     dataloader = torch.utils.data.DataLoader(
@@ -223,6 +220,8 @@ def train(args) -> None:
         num_workers=args["num_workers"],
         pin_memory=True,
     )
+
+    z_sample = torch.randn(args["latent_dim"], args["latent_dim"]).to(DEVICE)
 
     # Starting training loop
     for epoch in tqdm(
@@ -244,6 +243,8 @@ def train(args) -> None:
 
         # In your training loop:
         for i, (images, _) in enumerate(dataloader):
+            if i == args["max_steps"]:
+                break
             step = epoch * len(dataloader) + i + 1
             images = images.to(DEVICE, non_blocking=True)
             batch = images.size(0)
@@ -328,11 +329,7 @@ def train(args) -> None:
         # Switch to evaluation mode and sample new images
         Generator.eval()
 
-        # Generate new samples to save
-        z_sample = Variable(torch.randn(args["latent_dim"], args["latent_dim"]))
-        if args["cuda"]:
-            z_sample = z_sample.to(DEVICE, non_blocking=True)
-
+        # Same latent vectors every epoch, so the snapshots show training progress
         fake_gen_images = (Generator(z_sample).data + 1) / 2.0
 
         torchvision.utils.save_image(
@@ -356,8 +353,18 @@ def train(args) -> None:
             f'{args["checkpoint"]}')
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Train the WGAN-GP")
+    parser.add_argument("--seed", type=int, default=69096, help="Seed")
+    parser.add_argument("--epochs", type=int, help="Overrides n_epochs")
+    parser.add_argument("--max_steps", type=int, help="Batches per epoch (smoke test)")
+    cli = parser.parse_args()
+    torch.manual_seed(cli.seed)
+
     # Get parameters
     param = config()
+    param["n_epochs"] = cli.epochs or param["n_epochs"]
+    param["max_steps"] = cli.max_steps
+    param["cuda"] = param["cuda"] and torch.cuda.is_available()
 
     # Check for necessary files and directories
     training_image = pathlib.Path(param["training_image"])
@@ -365,13 +372,14 @@ if __name__ == "__main__":
         print(f"Training image not found at path: '{training_image}'")
         sys.exit(-1)
 
-    print("Generating sliding windows, please wait...")
-    windows = generate_windows(
-        training_image_path=param["training_image"], img_size=128, args=param
-    )
+    if not any(pathlib.Path(param["output_dir"]).glob("*.png")):
+        print("Generating sliding windows, please wait...")
+        windows = generate_windows(
+            training_image_path=param["training_image"], img_size=128, args=param
+        )
 
-    print("Saving all sliding windows...")
-    save_generated_images(windows, param)
+        print("Saving all sliding windows...")
+        save_generated_images(windows, param)
 
     # Train the generative model
     train(param)

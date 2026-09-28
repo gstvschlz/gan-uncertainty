@@ -60,8 +60,8 @@ class Plots:
 
         self.reference_ti, self.samples = self.load_samples()
         self.snesim = np.load(
-            "/home/user/gan-uncertainty/snesim/data/realizations.npy").reshape((100, 150, 150))
-        self.gan = np.load("/home/user/gan-uncertainty/generative_model/data/snesim_simulations.npy").reshape((100,150,150))
+            "outputs/snesim/snesim.npy").reshape((-1, 150, 150))
+        self.gan = np.load("outputs/gan/gan.npy").reshape((-1, 150, 150))
         self.snesim_df, self.gan_df = self.get_dict_realizations()
 
         self.__plot_all()
@@ -87,7 +87,7 @@ class Plots:
         self.absolute_difference()
         self.plot_uncertainty()
         self.proportions_comparison(
-            self.snesim.reshape(100, -1), self.gan.reshape(100, -1)
+            self.snesim.reshape(-1, 150 * 150), self.gan.reshape(-1, 150 * 150)
         )
         self.gan_realizations_grid()
         self.mds()
@@ -95,10 +95,10 @@ class Plots:
         return True
 
     def load_samples(self):
-        file = read_conditional_samples("snesim/data/reference_ti")["D"]
+        file = read_conditional_samples("src/snesim/data/reference_ti")["D"]
         reference_ti = file.reshape(1, 150, 150)[0, :, :]
 
-        conditioning_data = read_conditional_samples("snesim/data/samples50")["D"]
+        conditioning_data = read_conditional_samples("src/snesim/data/samples50")["D"]
 
         # Samples to dataframe
         samples = pd.DataFrame()
@@ -134,7 +134,7 @@ class Plots:
 
         return colorbar
 
-    def strebelle(self, ti_path: str = "generative_model/strebelle.png"):
+    def strebelle(self, ti_path: str = "src/snesim/data/strebelle.png"):
         ti = cv2.imread(ti_path)
         fig, ax = plt.subplots(figsize=self.figsize)
 
@@ -145,7 +145,7 @@ class Plots:
         cb = self._get_categorical_cb()
         plt.grid(False)
         plt.savefig(
-            "results/strebelle_ti.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/strebelle_ti.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     def location_map(self, reference_ti, samples):
@@ -170,7 +170,7 @@ class Plots:
 
         plt.gca().set_aspect("equal")
         plt.savefig(
-            "results/sample_map.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/sample_map.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     def snesim_realizations_grid(self):
@@ -206,7 +206,7 @@ class Plots:
             ax.set_yticks(range(0, 150, 50))
         plt.grid(False)
         plt.savefig(
-            "results/snesim_grid.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/snesim_grid.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     def etype(self):
@@ -234,8 +234,8 @@ class Plots:
         for ax, im in zip(
             grid,
             (
-                self.snesim.reshape(100, 150, 150).mean(axis=0),
-                self.gan.reshape(100, 150, 150).mean(axis=0),
+                self.snesim.reshape(-1, 150, 150).mean(axis=0),
+                self.gan.reshape(-1, 150, 150).mean(axis=0),
             ),
         ):
             im = ax.imshow(im, cmap="gray", origin="lower")
@@ -249,7 +249,7 @@ class Plots:
         plt.grid(False)
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
-        plt.savefig("results/etype.pdf", format="pdf", bbox_inches="tight", dpi=300)
+        plt.savefig("outputs/figures/etype.pdf", format="pdf", bbox_inches="tight", dpi=300)
 
     def std_plot(self):
         fig = plt.figure(figsize=self.figsize)
@@ -276,8 +276,8 @@ class Plots:
         for ax, im in zip(
             grid,
             (
-                self.snesim.reshape(100, 150, 150).std(axis=0),
-                self.gan.reshape(100, 150, 150).std(axis=0),
+                self.snesim.reshape(-1, 150, 150).std(axis=0),
+                self.gan.reshape(-1, 150, 150).std(axis=0),
             ),
         ):
             im = ax.imshow(im, cmap="jet", origin="lower")
@@ -291,7 +291,7 @@ class Plots:
         plt.grid(False)
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
-        plt.savefig("results/std_plot.pdf", format="pdf", bbox_inches="tight", dpi=300)
+        plt.savefig("outputs/figures/std_plot.pdf", format="pdf", bbox_inches="tight", dpi=300)
 
     def absolute_difference(self):
         fig, ax = plt.subplots(1, 1, figsize=self.figsize)
@@ -304,8 +304,8 @@ class Plots:
         # Add data to image grid
         im = ax.imshow(
             np.abs(
-                self.snesim.reshape(100, 150, 150).mean(axis=0)
-                - self.gan.reshape(100, 150, 150).mean(axis=0)
+                self.snesim.reshape(-1, 150, 150).mean(axis=0)
+                - self.gan.reshape(-1, 150, 150).mean(axis=0)
             ),
             cmap="jet",
             origin="lower",
@@ -317,7 +317,7 @@ class Plots:
         cb.set_label("Delta")
         plt.grid(False)
         plt.savefig(
-            "results/absolute_diff.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/absolute_diff.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     @staticmethod
@@ -349,7 +349,7 @@ class Plots:
 
         # plt.title("Histogram for uncertainty values in both workflows")
         plt.savefig(
-            "uncertainty_histogram.pdf",
+            "outputs/figures/uncertainty_histogram.pdf",
             format="pdf",
             dpi=300,
             bbox_inch="tight",
@@ -396,7 +396,7 @@ class Plots:
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
         plt.savefig(
-            "results/uncertainty.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/uncertainty.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     @staticmethod
@@ -457,7 +457,7 @@ class Plots:
             ncol=2,
         )
         plt.savefig(
-            "results/proportions.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/proportions.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     def gan_realizations_grid(self):
@@ -491,11 +491,11 @@ class Plots:
             # Adjust axis ticks
             ax.set_xticks(range(0, 150, 50))
             ax.set_yticks(range(0, 150, 50))
-        plt.savefig("results/gan_grid.pdf", format="pdf", bbox_inches="tight", dpi=300)
+        plt.savefig("outputs/figures/gan_grid.pdf", format="pdf", bbox_inches="tight", dpi=300)
 
     def mds_calculus(self):
-        traditional = self.snesim.reshape(100, -1)
-        proposed = self.gan.reshape((100, -1))
+        traditional = self.snesim.reshape(-1, 150 * 150)
+        proposed = self.gan.reshape((-1, 150 * 150))
 
         mds = MDS(n_components=3, metric=True, random_state=0)
 
@@ -532,7 +532,7 @@ class Plots:
         plt.xticks(plt.xticks()[0], sorted_keys)
 
         plt.savefig(
-            "results/mds_distance.pdf", format="pdf", bbox_inches="tight", dpi=300
+            "outputs/figures/mds_distance.pdf", format="pdf", bbox_inches="tight", dpi=300
         )
 
     def mds3d(self, traditional_coord, proposed_coord):
@@ -553,7 +553,7 @@ class Plots:
 
         ax.legend(["Traditional workflow", "Proposed workflow"])
         plt.xlabel("Uncertainty values")
-        plt.savefig("results/mds3d.pdf", format="pdf", bbox_inches="tight", dpi=300)
+        plt.savefig("outputs/figures/mds3d.pdf", format="pdf", bbox_inches="tight", dpi=300)
 
     def mds(self):
         original, gan = self.mds_calculus()
@@ -571,7 +571,7 @@ class Plots:
 
 
 if __name__ == "__main__":
-    os.makedirs("results", exist_ok=True)
+    os.makedirs("outputs/figures", exist_ok=True)
 
     # Plot everything!
     plotter = Plots()

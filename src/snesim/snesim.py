@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import subprocess
 from typing import Dict
 import numpy as np
 import pandas as pd
@@ -18,29 +19,29 @@ def get_args() -> argparse.Namespace:
         description="Perform easy SNESIM simulations with this CLI!"
     )
     parser.add_argument(
-        "--samples_path", default="data/samples50", type=str, help="Samples path"
+        "--samples_path", default="src/snesim/data/samples50", type=str, help="Samples path"
     )
 
     parser.add_argument(
         "--ti_path",
-        default="data/ti_strebelle.out",
+        default="src/snesim/data/strebelle.out",
         type=str,
         help="Training image path",
     )
 
     parser.add_argument(
         "--par_path",
-        default="data/snesim.par",
+        default="outputs/snesim.par",
         type=str,
         help="SNESIM parameter file path",
     )
 
     parser.add_argument(
-        "--exe_path", default="data/snesim.exe", type=str, help="SNESIM executable path"
+        "--exe_path", default="src/snesim/data/snesim.exe", type=str, help="SNESIM executable path"
     )
 
     parser.add_argument(
-        "--output_path", default="data/snesim.out", type=str, help="Output path"
+        "--output_path", default="outputs/snesim/snesim.out", type=str, help="Output path"
     )
 
     parser.add_argument(
@@ -58,7 +59,11 @@ def get_args() -> argparse.Namespace:
         "--min_cond", default=10, type=int, help="Minimum number of points to condition"
     )
 
-    parser.add_argument("--seed", default=69069, type=int, help="Seed")
+    parser.add_argument(
+        "--ti_dim", default=250, type=int, help="Training image size (square)"
+    )
+
+    parser.add_argument("--seed", default=69096, type=int, help="Seed")
 
     return parser.parse_args()
 
@@ -106,7 +111,7 @@ rotangle.dat                  - file for rotation and affinity
 1.0  2.0  1.0                 - affinity factors
 6{" "*30}         - number of multiple grids
 {arguments.ti_path}           - file for training image
-250  250  1                   - training image dimensions: nxtr, nytr, nztr
+{arguments.ti_dim}  {arguments.ti_dim}  1                   - training image dimensions: nxtr, nytr, nztr
 1{" "*30}         - column for training variable
 10.0   10.0   5.0             - maximum search radii (hmax,hmin,vert)
 0.0    0.0   0.0              - angles for search ellipsoid
@@ -171,12 +176,14 @@ def read_conditional_samples(filename: str = "eas.dat", nanval: int = -997799) -
 
 def run_simulation(params: argparse.Namespace) -> None:
     """
-    Runs the SNESIM simulation using WINE.
+    Runs the SNESIM simulation (natively on Windows, through WINE elsewhere).
 
     Args:
         params (argparse.Namespace): Parsed command line arguments.
     """
-    os.system(f"echo {params.par_path} | wine {params.exe_path}")
+    exe = os.path.abspath(params.exe_path)
+    cmd = [exe] if os.name == "nt" else ["wine", exe]
+    subprocess.run(cmd, input=params.par_path + "\n", text=True, check=True)
 
 
 def load_ti(filename: str) -> np.ndarray:
@@ -223,24 +230,21 @@ def save_simulations(filename: str, num_realizations: int) -> None:
     data = read_conditional_samples(filename)["D"]
     realizations = data[:, 0].reshape(num_realizations, 150, 150)
 
-    np.save("data/realizations.npy", realizations, allow_pickle=True)
+    np.save(os.path.splitext(filename)[0] + ".npy", realizations)
 
 
 if __name__ == "__main__":
-    os.makedirs("results", exist_ok=True)
-
     # Get arguments for parameter file
     args = get_args()
+
+    os.makedirs(os.path.dirname(args.par_path) or ".", exist_ok=True)
+    os.makedirs(os.path.dirname(args.output_path) or ".", exist_ok=True)
 
     # Create parameter file
     change_parameters(args)
 
-    # Calls SNESIM.exe with wine :)
+    # Calls snesim.exe
     run_simulation(args)
 
-    # Plots graphs
-    ti_file = load_ti("data/reference_ti")
-    conditioning_data = load_conditional_data(args.samples_path)
-
     save_simulations(args.output_path, args.realizations)
-    print("--- Ended traditional workflow! ---")
+    print("--- Ended traditional workflow! ---")

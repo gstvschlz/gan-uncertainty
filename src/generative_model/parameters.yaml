@@ -1,0 +1,15 @@
+output_dir: outputs/windowed_ti/augmented
+training_image: src/snesim/data/strebelle.png
+checkpoint: checkpoints/
+sample_images: outputs/progress
+images_path: outputs/windowed_ti/
+
+num_channels: 1
+latent_dim: 100
+learning_rate: 0.0002
+batch_size: 64
+num_workers: 0
+
+n_epochs: 5
+cuda: True
+n_critic: 5
