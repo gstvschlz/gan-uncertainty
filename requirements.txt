@@ -3,6 +3,7 @@ torch==2.11.0  # WGAN-GP; the cu128 wheel is needed for Blackwell GPUs and falls
 torchvision==0.26.0  # training dataset and image grids
 numpy==2.4.6  # arrays, GSLIB grids
 pandas==3.0.6  # figures: tables of realizations
+Pillow==12.3.0  # GIF frames (ships with matplotlib; pinned because scripts/gifs.py imports it)
 opencv-python==5.0.0.93  # image I/O and resizing
 scikit-image==0.26.0  # sliding windows, SSIM filter
 scikit-learn==1.9.1  # MDS in figures
