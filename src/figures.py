@@ -28,7 +28,7 @@ pylab.rcParams.update(params)
 
 random.seed(69096)
 
-plt.style.use(["science", "ieee", "bright"])
+plt.style.use(["science", "ieee", "bright", "no-latex"])
 
 
 class Handler(object):
@@ -126,6 +126,7 @@ class Plots:
 
         colorbar = plt.colorbar(
             mpl.cm.ScalarMappable(cmap=cmap, norm=norm),
+            ax=plt.gca(),
             ticks=tickz,
             format=fmt,
             spacing="proportional",
@@ -245,7 +246,6 @@ class Plots:
         cb = ax.cax.colorbar(im)
         cb.ax.get_yaxis().labelpad = 15
         cb.set_label("Mean value")
-        ax.cax.toggle_label(True)
         plt.grid(False)
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
@@ -287,7 +287,6 @@ class Plots:
         cb = ax.cax.colorbar(im)
         cb.ax.get_yaxis().labelpad = 15
         cb.set_label("Standard deviation value")
-        ax.cax.toggle_label(True)
         plt.grid(False)
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
@@ -352,8 +351,7 @@ class Plots:
             "outputs/figures/uncertainty_histogram.pdf",
             format="pdf",
             dpi=300,
-            bbox_inch="tight",
-            palette=["lightblue", "salmon"],
+            bbox_inches="tight",
         )
 
     def plot_uncertainty(self):
@@ -391,7 +389,6 @@ class Plots:
         cb = ax.cax.colorbar(im)
         cb.ax.get_yaxis().labelpad = 15
         cb.set_label("Uncertainty")
-        ax.cax.toggle_label(True)
         plt.grid(False)
         fig.tight_layout()
         fig.subplots_adjust(top=1.25)
@@ -445,7 +442,7 @@ class Plots:
         for i, val in enumerate(ground_truths):
             plt.axhline(val, color=colors[i], linestyle="dashed")
 
-        ax.set_ylabel("Facies proportion in \%")
+        ax.set_ylabel("Facies proportion in %")
 
         plt.legend(
             handles=[plt.Rectangle((0, 0), 1, 1, color=color) for color in colors],
@@ -527,8 +524,8 @@ class Plots:
         ax.set(xlabel="Workflow", ylabel="Distance to centroid")
         box = seaborn.boxplot(data=sorted_vals, width=0.1, showfliers=False)
         # category labels
-        plt.text(1.1, round(np.mean(traditional), 2), f"{round(np.mean(traditional), 2)}\%")
-        plt.text(0.1, round(np.mean(proposed), 2), f"{round(np.mean(proposed), 2)}\%")
+        plt.text(1.1, round(np.mean(traditional), 2), f"{round(np.mean(traditional), 2)}%")
+        plt.text(0.1, round(np.mean(proposed), 2), f"{round(np.mean(proposed), 2)}%")
         plt.xticks(plt.xticks()[0], sorted_keys)
 
         plt.savefig(
