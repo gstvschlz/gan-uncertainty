@@ -1,0 +1,50 @@
+[tools]
+python = "3.11"
+
+[env]
+_.python.venv = { path = ".venv", create = true }
+
+[tasks.setup]
+description = "Create .venv and install dependencies"
+run = "python -m pip install -r requirements.txt"
+
+[tasks.train]
+description = "Train the WGAN-GP (GPU optional); flags: --seed --epochs --max_steps"
+run = "python src/generative_model/gan.py"
+
+[tasks.sample]
+description = "Generate the TI catalog into outputs/ (flags: --num_samples --seed)"
+run = "python src/generative_model/sampling.py"
+
+[tasks.snesim]
+description = "Single-TI baseline plus one SNESIM realization per catalog TI (Windows: snesim.exe; elsewhere: wine)"
+run = "python scripts/run_snesim.py"
+
+[tasks.figures]
+description = "Paper figures into outputs/figures/"
+run = "python src/figures.py"
+
+[tasks.gifs]
+description = "Generate docs/*.gif"
+run = "echo not implemented yet"
+
+[tasks.docs]
+description = "Build the Pages site (docs/)"
+run = "echo not implemented yet"
+
+[tasks.check]
+description = "compileall + catalog shape + facies-proportion assertion"
+run = "python scripts/check.py"
+
+[tasks.all]
+description = "Run the whole pipeline"
+run = [
+  { task = "setup" },
+  { task = "train" },
+  { task = "sample" },
+  { task = "snesim" },
+  { task = "figures" },
+  { task = "gifs" },
+  { task = "docs" },
+  { task = "check" },
+]
