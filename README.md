@@ -1,6 +1,4 @@
-# gan-uncertainty
-
-Code to reproduce the workflow of Scholze, Bassani and Costa (2023), *Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation*, Geoenergy Science and Engineering 230, 212257. Paper: <https://doi.org/10.1016/j.geoen.2023.212257>.
+> Code to reproduce the workflow of Scholze, Bassani and Costa (2023), *Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation*, Geoenergy Science and Engineering 230, 212257. Paper: <https://doi.org/10.1016/j.geoen.2023.212257>.
 
 Most multiple-point statistics (MPS) workflows draw every realization from one training image (TI), so the uncertainty about the TI itself is ignored and spatial uncertainty is understated. Here a WGAN-GP learns the patterns of a reference TI (Strebelle's 250x250 fluvial channels) and samples a catalog of TIs. Each catalog TI conditions one SNESIM realization. Realizations from the single reference TI form the baseline, and both workflows condition on the same well data (`samples50`). The paper concludes that the catalog workflow gives higher uncertainty and variability. This re-run agrees in direction, with a small margin (see Results).
 
