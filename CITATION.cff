@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite the article below."
 authors:
 - family-names: "Pretto Scholze"
   given-names: "Gustavo"
@@ -10,4 +10,22 @@ authors:
 title: "gan-uncertainty"
 version: 1.0.0
 date-released: 2022-10-16
-url: "https://github.com/algocompretto/gan-uncertainty"
+url: "https://github.com/gstvschlz/gan-uncertainty"
+repository-code: "https://github.com/gstvschlz/gan-uncertainty"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: "Pretto Scholze"
+    given-names: "Gustavo"
+    orcid: "https://orcid.org/0000-0003-3670-2875"
+  - family-names: "Arcari Bassani"
+    given-names: "Marcel Antonio"
+    orcid: "https://orcid.org/0000-0002-8212-2567"
+  - family-names: "Costa"
+    given-names: "João Felipe Coimbra Leite"
+  title: "Generative Adversarial Networks to incorporate the Training Image uncertainty in multiple-point statistics simulation"
+  journal: "Geoenergy Science and Engineering"
+  volume: 230
+  number: "212257"
+  year: 2023
+  doi: "10.1016/j.geoen.2023.212257"
