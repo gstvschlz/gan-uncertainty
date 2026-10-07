@@ -1,0 +1,23 @@
+# Conda environment for `mise run setup` (micromamba, into .conda/). conda-forge picks the
+# CUDA build of pytorch when an NVIDIA driver is present, the CPU build otherwise.
+name: gan-uncertainty
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch=2.13.0
+  - torchvision=0.28.0
+  - numpy=2.4.6
+  - pandas=3.0.6
+  - pillow=12.3.0
+  - opencv=5.0.0
+  - scikit-image=0.26.0
+  - scikit-learn=1.9.1
+  - matplotlib-base=3.11.2
+  - seaborn=0.13.2
+  - scienceplots=2.2.2
+  - pyyaml=6.0.3
+  - tensorboardx=2.6.2.2
+  - pip
+  - pip:
+      - boitata==0.5.0

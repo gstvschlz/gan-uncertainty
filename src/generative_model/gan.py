@@ -1,385 +1,175 @@
-import os
+"""Train the WGAN-GP on random native-scale crops of the reference TI (`mise run train`).
+
+Speed: the TI lives on the GPU and batches are cropped there (no image files, no data
+loader); bf16 autocast and TF32; a small fully convolutional pair. Quality: the critic
+sees DiffAugment-ed inputs, the sampled generator is an EMA of the trained weights, and
+the kept checkpoint is the one whose 250x250 samples best match the reference's sand
+proportion and indicator variograms.
+"""
+
 import argparse
-import cv2
-import sys
-import yaml
-import time
-import torch
-import shutil
+import copy
 import pathlib
-import torchvision
+import time
+
+import cv2
+import numpy as np
 import tensorboardX
-import torch.nn as nn
-import torchvision.transforms as transforms
-
-from tqdm import tqdm
+import torch
+import torch.nn.functional as F
+import torchvision
+import yaml
 from torch.autograd import grad
-from torch.autograd import Variable
-from skimage.util import view_as_windows
-from arch.models import GeneratorModel, CriticModel
 
-# Constants
-DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+from arch.models import SCALE, CriticModel, GeneratorModel
+from sampling import DEVICE, generate, latents, variogram
+
 CONFIG_FILE = pathlib.Path(__file__).with_name("parameters.yaml")
-CHECKPOINT_FILENAME = "latest_checkpoint"
-
-def gradient_penalty(x, y, f):
-    shape = [x.size(0)] + [1] * (x.dim() - 1)
-    alpha = torch.rand(shape).to(DEVICE, non_blocking=True)
-    z = x + alpha * (y - x)
-    z = Variable(z, requires_grad=True)
-    z = z.to(DEVICE, non_blocking=True)
-    o = f(z)
-    g = grad(
-        o,
-        z,
-        grad_outputs=torch.ones(o.size()).to(DEVICE, non_blocking=True),
-        create_graph=True,
-    )[0].view(z.size(0), -1)
-    gp = ((g.norm(p=2, dim=1)) ** 2).mean()
-    return gp
 
 
-def save_checkpoint(state, save_path, is_best=True, max_keep=None):
-    # save checkpoint
-    torch.save(state, f"{save_path}/Epoch.ckpt")
-
-    # deal with max_keep
-    save_dir = os.path.dirname(save_path)
-    list_path = os.path.join(save_dir, CHECKPOINT_FILENAME)
-
-    save_path = os.path.basename(save_path)
-    if os.path.exists(list_path):
-        with open(list_path) as f:
-            ckpt_list = f.readlines()
-            ckpt_list = [save_path + "\n"] + ckpt_list
-    else:
-        ckpt_list = [save_path + "\n"]
-
-    if max_keep is not None:
-        for ckpt in ckpt_list[max_keep:]:
-            ckpt = os.path.join(save_dir, ckpt[:-1])
-            if os.path.exists(ckpt):
-                os.remove(ckpt)
-        ckpt_list[max_keep:] = []
-
-    with open(list_path, "w") as f:
-        f.writelines(ckpt_list)
+def load_ti(path: str) -> torch.Tensor:
+    """Binary TI as a float tensor in {-1, 1} (sand = 1), on the training device."""
+    ti = cv2.imread(path, cv2.IMREAD_GRAYSCALE) > 127
+    return torch.tensor(ti, dtype=torch.float32, device=DEVICE) * 2 - 1
 
 
-def load_checkpoint(ckpt_dir_or_file, map_location=None, load_best=False):
-    if os.path.isdir(ckpt_dir_or_file):
-        if load_best:
-            ckpt_path = os.path.join(ckpt_dir_or_file, "best_model.ckpt")
-        else:
-            try:
-                with open(os.path.join(ckpt_dir_or_file, CHECKPOINT_FILENAME)) as f:
-                    ckpt_path = os.path.join(ckpt_dir_or_file, f.readline()[:-1])
-            except FileNotFoundError:
-                print("Checkpoint file not found. Starting training from scratch.")
-                return None
-    else:
-        ckpt_path = ckpt_dir_or_file
-    ckpt = torch.load(ckpt_path, map_location=map_location)
-    print("[INFO] Loading checkpoint from %s succeed!" % ckpt_path)
-    return ckpt
+def crops(ti: torch.Tensor, n: int, size: int) -> torch.Tensor:
+    """n random size x size windows of the TI, each randomly mirrored in x and y."""
+    k = torch.arange(size, device=DEVICE)
+
+    def axis(length):
+        start = torch.randint(0, length - size + 1, (n, 1), device=DEVICE)
+        flip = torch.rand(n, 1, device=DEVICE) < 0.5
+        return start + torch.where(flip, size - 1 - k, k)
+
+    rows, cols = axis(ti.shape[0]), axis(ti.shape[1])
+    return ti[rows[:, :, None], cols[:, None, :]].unsqueeze(1)
 
 
-def config():
-    config_file = pathlib.Path(CONFIG_FILE)
-    if not config_file.is_file():
-        print(f"Config file '{config_file}' not found!")
-        sys.exit(-1)
-
-    with config_file.open("r") as stream:
-        try:
-            parsed_yaml = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print("Error parsing .yaml config file!")
-            sys.exit(-1)
-    return parsed_yaml
+def gradient_penalty(critic, real, fake):
+    """Two-sided WGAN-GP penalty, E[(||grad D(x_hat)|| - 1)^2] on interpolates."""
+    alpha = torch.rand(real.size(0), 1, 1, 1, device=DEVICE)
+    x = (real + alpha * (fake - real)).requires_grad_(True)
+    (g,) = grad(critic(x).float().sum(), x, create_graph=True)
+    return ((g.flatten(1).norm(dim=1) - 1) ** 2).mean()
 
 
-def check_directory(directory: str) -> None:
-    """
-    Checks if a directory exists, if not, it creates it.
+def diff_augment(x: torch.Tensor) -> torch.Tensor:
+    """DiffAugment (Zhao et al. 2020), applied to every critic input, real and fake:
+    random translation by up to 1/8 of the side (zero fill) and a random cutout of half
+    the side. With one training image the critic otherwise memorises the real crops."""
+    n, _, size, _ = x.shape
+    k, s, c = torch.arange(size, device=DEVICE), size // 8, size // 2
+    xp = F.pad(x, (s, s, s, s))
+    rows = torch.randint(0, 2 * s + 1, (n, 1), device=DEVICE) + k
+    cols = torch.randint(0, 2 * s + 1, (n, 1), device=DEVICE) + k
+    x = xp[torch.arange(n, device=DEVICE)[:, None, None], 0, rows[:, :, None], cols[:, None, :]]
+    cy, cx = torch.randint(0, size - c + 1, (2, n, 1), device=DEVICE)
+    cut = ((k >= cy) & (k < cy + c))[:, :, None] & ((k >= cx) & (k < cx + c))[:, None, :]
+    return (x * ~cut).unsqueeze(1)
 
-    Parameters
-    ----------
-    directory : str
-        Directory path.
-    """
-    pathlib.Path(directory).mkdir(parents=True, exist_ok=True)
+
+@torch.no_grad()
+def ema_update(ema, model, decay):
+    for e, p in zip(ema.parameters(), model.parameters()):
+        e.lerp_(p, 1 - decay)
+    for e, b in zip(ema.buffers(), model.buffers()):
+        e.copy_(b)
 
 
-def watch_for_checkpoints(args, Critic, Generator, critic_opt, gen_opt):
-    checkpoint = args["checkpoint"]
-    save_dir = args["sample_images"]
+def score(generator, ref: np.ndarray, ref_vario: np.ndarray, n: int = 32) -> float:
+    """Distance of n generated 250x250 TIs to the reference: relative error of the sand
+    proportion plus mean relative error of the x/y indicator variograms (lags 1..50)."""
+    tis = generate(generator, latents(n, generator.z_ch))
+    p, p_ref = tis.mean(), ref.mean()
+    return float(abs(p - p_ref) / p_ref + np.abs(variogram(tis) - ref_vario).mean() / ref_vario.mean())
 
-    # Check and create paths if necessary
-    check_directory(checkpoint)
-    check_directory(save_dir)
 
-    # Loads checkpoint and changes state dictionary
-    ckpt = load_checkpoint(checkpoint)
-    start_epoch = ckpt["epoch"]
-    Critic.load_state_dict(ckpt["D"])
-    Generator.load_state_dict(ckpt["Generator"])
-    critic_opt.load_state_dict(ckpt["d_optimizer"])
-    gen_opt.load_state_dict(ckpt["g_optimizer"])
-    return start_epoch
+def train(args: dict) -> None:
+    ckpt_dir, progress_dir = pathlib.Path(args["checkpoint"]), pathlib.Path(args["sample_images"])
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    progress_dir.mkdir(parents=True, exist_ok=True)
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
 
-def generate_windows(
-    training_image_path: str, args: dict, img_size: tuple = (128, 128), stride: int = 1
-):
-    """
-    Generate sliding windows using scikit-image function `view_as_windows`.
+    ti = load_ti(args["training_image"])
+    ref = (ti > 0).cpu().numpy()
+    ref_vario = variogram(ref)
 
-    Parameters
-    ----------
-    training_image_path : str
-        Path to Strebelle training image.
-    args : dict
-        Parsed arguments as dictionary.
-    img_size : tuple, optional
-        Size of windows to be saved. The default is (64, 64).
-    stride : int, optional
-        Step of which the window walks. The default is 1.
-
-    Returns
-    -------
-    windows : np.ndarray
-        Array with batch size containing saved images.
-    """
-    ti32 = cv2.imread(training_image_path, cv2.COLOR_BGR2GRAY)
-
-    _, ti = cv2.threshold(ti32, 127, 255, cv2.THRESH_BINARY)
-
-    windows = view_as_windows(ti, (150, 150))
-    return windows
-
-def save_generated_images(windowed_images, args: dict) -> None:
-    output_dir = args['output_dir']
-    check_directory(output_dir)
-
-    for i, batch_ti in tqdm(
-        enumerate(windowed_images),
-        desc="Sliding window, please wait...",
-        total=windowed_images.shape[0],
-        colour="blue",
-    ):
-        for j, t in enumerate(batch_ti):
-            ti_resized = cv2.resize(t, (128, 128))
-            cv2.imwrite(f"{args['output_dir']}/strebelle_{i}_{j}.png", ti_resized)
-
-# Ignore warnings
-if not sys.warnoptions:
-    import warnings
-    warnings.simplefilter("ignore")
-
-def train(args) -> None:
-    # Get paths from args
-    checkpoint_dir = args["checkpoint"]
-    sample_images_dir = args["sample_images"]
-    images_path = args["images_path"]
-
-    # Check and create paths if necessary
-    check_directory(checkpoint_dir)
-    check_directory(sample_images_dir)
-
-    Critic = nn.DataParallel(CriticModel(args["num_channels"])).to(DEVICE, non_blocking=True)
-    Generator = nn.DataParallel(GeneratorModel(args["latent_dim"])).to(DEVICE, non_blocking=True)
-
-    # Instantiates optimizers
-    G_opt = torch.optim.Adam(
-        Generator.parameters(), lr=args["learning_rate"], betas=(0.5, 0.999)
-    )
-    C_opt = torch.optim.Adam(
-        Critic.parameters(), lr=args["learning_rate"], betas=(0.5, 0.999)
-    )
-
-    # start_epoch = watch_for_checkpoints(args, Critic, Generator, C_opt, G_opt)
-    start_epoch = 0
-    # Loading Dataset
-    transf = transforms.Compose(
-        [
-            transforms.ToTensor(),
-            transforms.Grayscale(num_output_channels=1),
-            transforms.Normalize([0.5], [0.5]),
-            transforms.Resize((256,256), antialias=True),
-        ]
-    )
+    G = GeneratorModel(args["latent_channels"]).to(DEVICE)
+    D = CriticModel().to(DEVICE)
+    G_ema = copy.deepcopy(G).eval().requires_grad_(False)
+    opt = dict(lr=args["learning_rate"], betas=tuple(args["betas"]))
+    G_opt, D_opt = torch.optim.Adam(G.parameters(), **opt), torch.optim.Adam(D.parameters(), **opt)
 
     writer = tensorboardX.SummaryWriter("outputs/logs/wgan-gp")
+    cells, bs = args["crop"] // SCALE, args["batch_size"]
+    z_fixed = torch.randn(100, G.z_ch, cells, cells, device=DEVICE)
+    z = lambda: torch.randn(bs, G.z_ch, cells, cells, device=DEVICE)  # noqa: E731
+    # bf16 autocast (no loss scaling needed) halves the step time; the penalty's gradient
+    # norm is taken on the fp32 input.
+    amp = lambda: torch.autocast(DEVICE.type, torch.bfloat16, enabled=DEVICE.type == "cuda")  # noqa: E731
+    best, t0 = float("inf"), time.time()
 
-    data = torchvision.datasets.ImageFolder(args["images_path"], transform=transf)
-    dataloader = torch.utils.data.DataLoader(
-        data,
-        batch_size=args["batch_size"],
-        shuffle=True,
-        num_workers=args["num_workers"],
-        pin_memory=True,
-    )
+    for step in range(1, args["steps"] + 1):
+        D.requires_grad_(True)
+        for _ in range(args["n_critic"]):
+            real = crops(ti, bs, args["crop"])
+            with amp():
+                with torch.no_grad():
+                    fake = diff_augment(G(z()).float())
+                real = diff_augment(real)
+                em_distance = D(real).float().mean() - D(fake).float().mean()
+                gp = gradient_penalty(D, real, fake)
+            D_opt.zero_grad(set_to_none=True)
+            (-em_distance + args["gp_weight"] * gp).backward()
+            D_opt.step()
 
-    z_sample = torch.randn(args["latent_dim"], args["latent_dim"]).to(DEVICE)
+        D.requires_grad_(False)
+        with amp():
+            g_loss = -D(diff_augment(G(z()).float())).float().mean()
+        G_opt.zero_grad(set_to_none=True)
+        g_loss.backward()
+        G_opt.step()
+        ema_update(G_ema, G, args["ema_decay"])
 
-    # Starting training loop
-    for epoch in tqdm(
-        range(start_epoch, args["n_epochs"]),
-        desc="Training progress",
-        total=args["n_epochs"] - start_epoch,
-        position=0,
-        ncols=100,
-        leave=True,
-        colour="green",
-    ):
-        start_time = time.time()
-        critic_loss = []
-        gen_loss = []
-        Generator.train()
+        if step % 50 == 0:
+            writer.add_scalar("Critic/em_dist", em_distance.item(), step)
+            writer.add_scalar("Critic/gradient_penalty", gp.item(), step)
+            writer.add_scalar("Generator/g_loss", g_loss.item(), step)
 
-        # For mixed precision training
-        scaler = torch.cuda.amp.GradScaler()
-
-        # In your training loop:
-        for i, (images, _) in enumerate(dataloader):
-            if i == args["max_steps"]:
-                break
-            step = epoch * len(dataloader) + i + 1
-            images = images.to(DEVICE, non_blocking=True)
-            batch = images.size(0)
-            z = Variable(torch.randn(batch, args["latent_dim"]))
-            z = z.to(DEVICE, non_blocking=True)
-
-            # Amp up the process for mixed precision
-            with torch.cuda.amp.autocast():
-                generated = Generator(z)
-                real_criticized = Critic(images)
-                fake_criticized = Critic(generated)
-
-                em_distance = real_criticized.mean() - fake_criticized.mean()
-                grad_penalty = gradient_penalty(images.data, generated.data, Critic)
-
-                CriticLoss = -em_distance + grad_penalty * 10
-
-            # Scales the loss, and calls backward() to create scaled gradients
-            scaler.scale(CriticLoss).backward()
-
-            # Unscales the gradients of optimizer's assigned params in-place, and checks for infs and nans
-            scaler.unscale_(C_opt)
-
-            # If the gradients do not contain infs or NaNs, optimizer.step() is then called,
-            # otherwise, optimizer.step() is skipped.
-            scaler.step(C_opt)
-
-            # Updates the scale for next iteration
-            scaler.update()
-
-            # Reset gradients
-            Critic.zero_grad()
-
-            # Logs to tensorboard
-            writer.add_scalar(
-                "Critic/em_dist", em_distance.data.cpu().numpy(), global_step=step
-            )
-            writer.add_scalar(
-                "Critic/gradient_penalty",
-                grad_penalty.data.cpu().numpy(),
-                global_step=step,
-            )
-            writer.add_scalar(
-                "Critic/critic_loss", CriticLoss.data.cpu().numpy(), global_step=step
-            )
-
-            if step % args["n_critic"] == 0:
-                # Random latent noise
-                z = Variable(torch.randn(batch, args["latent_dim"]))
-
-                if args["cuda"]:
-                    z = z.to(DEVICE, non_blocking=True)
-
-                # Generate new images from this latent vector
-                generated = Generator(z)
-
-                fake_criticized = Critic(generated)
-                GeneratorLoss = -fake_criticized.mean()
-
-                # Append to list for logging purpose
-                gen_loss.append(GeneratorLoss.item())
-
-                # Backward pass
-                Critic.zero_grad()
-                Generator.zero_grad()
-                GeneratorLoss.backward()
-                G_opt.step()
-
-                # Logs loss scalar to tensorboard
-                writer.add_scalars(
-                    "Generator",
-                    {"g_loss": GeneratorLoss.data.cpu().numpy()},
-                    global_step=step,
+        if step % args["eval_every"] == 0 or step == args["steps"]:
+            s = score(G_ema, ref, ref_vario)
+            writer.add_scalar("Eval/score", s, step)
+            with torch.no_grad():
+                torchvision.utils.save_image(
+                    (G_ema(z_fixed) + 1) / 2, progress_dir / f"Step {step}.jpg", nrow=10
                 )
-
-                print(
-                    f"Epoch {epoch+1} : {i+1}/{len(dataloader)}:"
-                    + f"{round((time.time()-start_time)/60, 2)} mins",
-                    end="\r",
+            kept = s < best
+            if kept:
+                best = s
+                torch.save(
+                    {"step": step, "score": s, "z_ch": G.z_ch, "Generator": G_ema.state_dict()},
+                    ckpt_dir / "generator.ckpt",
                 )
+            print(
+                f"step {step}/{args['steps']}  W {em_distance.item():.3f}  gp {gp.item():.3f}  "
+                f"score {s:.4f}{' (kept)' if kept else ''}  {(time.time() - t0) / 60:.1f} min",
+                flush=True,
+            )
+    print(f"Best score {best:.4f}: {ckpt_dir / 'generator.ckpt'}")
 
-        # Switch to evaluation mode and sample new images
-        Generator.eval()
-
-        # Same latent vectors every epoch, so the snapshots show training progress
-        fake_gen_images = (Generator(z_sample).data + 1) / 2.0
-
-        torchvision.utils.save_image(
-            fake_gen_images,
-            args["sample_images"] + "/Epoch " + str(epoch + 1) + ".jpg",
-            nrow=10,
-        )
-
-        x = torchvision.utils.make_grid(fake_gen_images, nrow=5)
-        writer.add_image("Generated", x, step)
-
-        # Save checkpoints
-        save_checkpoint(
-            {
-                "epoch": epoch + 1,
-                "D": Critic.state_dict(),
-                "Generator": Generator.state_dict(),
-                "d_optimizer": C_opt.state_dict(),
-                "g_optimizer": G_opt.state_dict(),
-            },
-            f'{args["checkpoint"]}')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train the WGAN-GP")
-    parser.add_argument("--seed", type=int, default=69096, help="Seed")
-    parser.add_argument("--epochs", type=int, help="Overrides n_epochs")
-    parser.add_argument("--max_steps", type=int, help="Batches per epoch (smoke test)")
+    parser.add_argument("--seed", type=int, default=69096)
+    parser.add_argument("--steps", type=int, help="Overrides steps (generator updates)")
+    parser.add_argument("--eval_every", type=int, help="Overrides eval_every")
     cli = parser.parse_args()
     torch.manual_seed(cli.seed)
 
-    # Get parameters
-    param = config()
-    param["n_epochs"] = cli.epochs or param["n_epochs"]
-    param["max_steps"] = cli.max_steps
-    param["cuda"] = param["cuda"] and torch.cuda.is_available()
-
-    # Check for necessary files and directories
-    training_image = pathlib.Path(param["training_image"])
-    if not training_image.is_file():
-        print(f"Training image not found at path: '{training_image}'")
-        sys.exit(-1)
-
-    if not any(pathlib.Path(param["output_dir"]).glob("*.png")):
-        print("Generating sliding windows, please wait...")
-        windows = generate_windows(
-            training_image_path=param["training_image"], img_size=128, args=param
-        )
-
-        print("Saving all sliding windows...")
-        save_generated_images(windows, param)
-
-    # Train the generative model
+    param = yaml.safe_load(CONFIG_FILE.read_text())
+    param["steps"] = cli.steps or param["steps"]
+    param["eval_every"] = cli.eval_every or param["eval_every"]
     train(param)

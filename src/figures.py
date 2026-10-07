@@ -110,15 +110,15 @@ class Plots:
 
     @staticmethod
     def _get_categorical_cb():
-        cmap = mpl.colors.ListedColormap(["white", "black"])
+        cmap = mpl.colors.ListedColormap(["black", "white"])
 
-        col_dict = {0: "white", 1: "black"}
+        col_dict = {0: "black", 1: "white"}
         norm_bins = np.sort([*col_dict.keys()]) + 0.5
         norm_bins = np.insert(norm_bins, 0, np.min(norm_bins) - 1.0)
 
         norm = mpl.colors.BoundaryNorm(norm_bins, 2, clip=True)
 
-        labels = np.array(["Sandstone", "Shale"])
+        labels = np.array(["Shale", "Sandstone"])
         fmt = mpl.ticker.FuncFormatter(lambda x, pos: labels[norm(x)])
 
         diff = norm_bins[1:] - norm_bins[:-1]

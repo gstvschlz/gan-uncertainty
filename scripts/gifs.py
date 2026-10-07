@@ -1,12 +1,12 @@
 """Generate the four docs/*.gif animations (`mise run gifs`).
 
-One two-tone facies colormap everywhere (sand = 1, mud = 0) on an opaque light
+One two-tone facies colormap everywhere (sand = 1 white, mud = 0 black) on an opaque light
 background, so the GIFs read the same on light and dark pages. Sizes stay small:
 fixed 27-colour palette, no dithering, ~30-40 frames.
 
   ti-latent-walk       slerp through the generator latent space, reference TI alongside
   ti-catalog           flipbook of catalog TIs with their sand proportion
-  training-progression fixed latent vectors at each saved epoch (outputs/progress)
+  training-progression fixed latent grids at each evaluation step (outputs/progress)
   realizations         baseline vs GAN-catalog realizations with running proportion histograms
 
 Inputs come from `mise run train | sample | snesim`; the walk re-runs the generator.
@@ -20,18 +20,13 @@ import cv2
 import matplotlib
 import numpy as np
 import torch
-import torch.nn.functional as F
 from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src" / "generative_model"))
-from sampling import DEVICE, load_generator  # noqa: E402
+from sampling import generate, latents, load_generator  # noqa: E402
 
-SAND, MUD = (240, 196, 84), (
-    38,
-    52,
-    92,
-)  # luminance-separated: safe for colour blindness
+SAND, MUD = (255, 255, 255), (0, 0, 0)  # sand white, mud black, as in the figures
 BG, INK, GRAY = (250, 250, 247), (30, 30, 30), (120, 120, 128)
 T, PAD, ROW, HIST_H = 200, 10, 18, 56  # panel size, margin, text row, histogram height
 FONT = ImageFont.truetype(
@@ -84,6 +79,10 @@ def tile(a: np.ndarray, size: int) -> np.ndarray:
 
 def paint(img: Image.Image, xy: tuple[int, int], a: np.ndarray) -> None:
     img.paste(Image.fromarray(np.where(a[..., None], SAND, MUD).astype(np.uint8)), xy)
+    # Gray frame: white sand would otherwise merge with the light background
+    ImageDraw.Draw(img).rectangle(
+        [xy[0] - 1, xy[1] - 1, xy[0] + a.shape[1], xy[1] + a.shape[0]], outline=GRAY
+    )
 
 
 def text(
@@ -131,13 +130,6 @@ def reference() -> np.ndarray:
     return cv2.imread(str(REFERENCE), cv2.IMREAD_GRAYSCALE) > 127
 
 
-def generate(z: torch.Tensor, generator: torch.nn.Module) -> np.ndarray:
-    """Same path as sampling.py: generator -> 250x250 -> binarize at 0 (sand = 1)."""
-    with torch.no_grad():
-        out = torch.cat([generator(b) for b in z.split(10)])
-    return (F.interpolate(out, size=(250, 250)).squeeze(1) > 0).cpu().numpy()
-
-
 def slerp(a: torch.Tensor, b: torch.Tensor, t: float) -> torch.Tensor:
     om = torch.acos(torch.clamp((a / a.norm() * b / b.norm()).sum(), -1, 1))
     return (torch.sin((1 - t) * om) * a + torch.sin(t * om) * b) / torch.sin(om)
@@ -146,10 +138,11 @@ def slerp(a: torch.Tensor, b: torch.Tensor, t: float) -> torch.Tensor:
 def latent_walk(a: argparse.Namespace, out: Path) -> None:
     """Closed slerp loop through `--keys` seeded latent vectors, `--steps` frames per leg."""
     torch.manual_seed(a.seed)
-    keys = torch.randn(a.keys, a.latent_size, device=DEVICE)
+    generator = load_generator(a.model_path)
+    keys = latents(a.keys, generator.z_ch)
     legs = [(i, j / a.steps) for i in range(a.keys) for j in range(a.steps)]
     z = torch.stack([slerp(keys[i], keys[(i + 1) % a.keys], t) for i, t in legs])
-    tis = generate(z, load_generator(a.model_path, a.latent_size))
+    tis = generate(generator, z)
     ref, p_ref = tile(reference(), T), reference().mean()
     frames = [
         pair_frame(
@@ -181,9 +174,9 @@ def catalog(a: argparse.Namespace, out: Path) -> None:
 
 
 def training(a: argparse.Namespace, out: Path) -> None:
-    """Same 4 tiles (fixed latent vectors) from each outputs/progress/Epoch N.jpg."""
+    """Same 4 tiles (fixed latent grids) from each outputs/progress/Step N.jpg."""
     files = sorted(
-        (ROOT / "outputs/progress").glob("Epoch *.jpg"),
+        (ROOT / "outputs/progress").glob("Step *.jpg"),
         key=lambda p: int(p.stem.split()[1]),
     )
     files = [
@@ -230,7 +223,7 @@ def training(a: argparse.Namespace, out: Path) -> None:
             (2 * PAD + block + block // 2, PAD + ROW + block + 2),
             f"sand {p_ref:.3f}",
         )
-        legend(d, h - ROW - 2, w, f"epoch {f.stem.split()[1]}")
+        legend(d, h - ROW - 2, w, f"step {f.stem.split()[1]}")
         frames.append(img)
     save(
         frames,
@@ -310,8 +303,7 @@ if __name__ == "__main__":
     )
     p.add_argument("--seed", type=int, default=69096)
     p.add_argument("--out", type=Path, default=ROOT / "docs")
-    p.add_argument("--model_path", default=str(ROOT / "checkpoints/Epoch.ckpt"))
-    p.add_argument("--latent_size", type=int, default=100)
+    p.add_argument("--model_path", default=str(ROOT / "checkpoints/generator.ckpt"))
     p.add_argument("--keys", type=int, default=5, help="latent walk: key vectors")
     p.add_argument("--steps", type=int, default=8, help="latent walk: frames per leg")
     p.add_argument(
