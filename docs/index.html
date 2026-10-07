@@ -220,8 +220,8 @@ footer { margin-top: 3rem; padding: 1rem 0 3rem; border-top: 1px solid var(--rul
 
 <section>
 <h2>Reproduce</h2>
-<p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require (the code falls back to the CPU), and <a href="https://github.com/gstvschlz/boitata">boitata</a>, whose SNESIM runs on Linux, macOS and Windows. On a laptop RTX 5090, training takes about 11 min and SNESIM about 15 s for both workflows. Nothing pretrained ships, so every artifact regenerates. GPU training is not bit-reproducible (cuDNN autotuning and bf16 arithmetic), so a rerun with the same seed keeps a different checkpoint and gives slightly different numbers.</p>
-<pre>mise run setup    # .venv and dependencies
+<p>Install <a href="https://mise.jdx.dev">mise</a>; it installs micromamba. The setup step builds a conda environment in <code>.conda/</code> from <code>environment.yml</code>: Python 3.11, PyTorch 2.13 from conda-forge (the CUDA build when an NVIDIA driver is present, the CPU build otherwise) and <a href="https://github.com/gstvschlz/boitata">boitata</a> from PyPI, whose SNESIM runs on Linux, macOS and Windows. On a laptop RTX 5090, training takes about 11 min and SNESIM about 15 s for both workflows. Nothing pretrained ships, so every artifact regenerates. GPU training is not bit-reproducible (cuDNN autotuning and bf16 arithmetic), so a rerun with the same seed keeps a different checkpoint and gives slightly different numbers.</p>
+<pre>mise run setup    # conda environment in .conda/
 mise run train    # WGAN-GP
 mise run sample   # the TI catalog
 mise run snesim   # realizations plus the single-TI baseline

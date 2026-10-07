@@ -1,12 +1,13 @@
 [tools]
-python = "3.11"
+micromamba = "2.9.0-0"
 
 [env]
-_.python.venv = { path = ".venv", create = true }
+# The conda environment in .conda/ (Windows layout, then Linux/macOS)
+_.path = [".conda", ".conda/Scripts", ".conda/Library/bin", ".conda/bin"]
 
 [tasks.setup]
-description = "Create .venv and install dependencies"
-run = "python -m pip install -r requirements.txt"
+description = "Create the conda environment in .conda/ from environment.yml"
+run = "micromamba create -y -p \"{{config_root}}/.conda\" -f environment.yml"
 
 [tasks.train]
 description = "Train the WGAN-GP (GPU optional); flags: --seed --steps --eval_every"

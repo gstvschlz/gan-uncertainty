@@ -31,10 +31,10 @@ The catalog realizations spread more than the baseline: a standard deviation of 
 
 ## Reproduce
 
-Needs [mise](https://mise.jdx.dev). It installs Python 3.11. `setup` builds `.venv` and installs torch 2.11 from the CUDA 12.8 wheel index (required by RTX 50-series GPUs; the code falls back to the CPU) and [boitata](https://github.com/gstvschlz/boitata), whose SNESIM runs on Linux, macOS and Windows. Nothing pretrained ships; every artifact regenerates. GPU training is not bit-reproducible (cuDNN autotuning and bf16 arithmetic), so a rerun with the same seed keeps a different checkpoint and gives slightly different numbers.
+Needs [mise](https://mise.jdx.dev). It installs micromamba, and `setup` builds a conda environment in `.conda/` from `environment.yml`: Python 3.11, PyTorch 2.13 from conda-forge (the CUDA build when an NVIDIA driver is present, the CPU build otherwise) and [boitata](https://github.com/gstvschlz/boitata) from PyPI, whose SNESIM runs on Linux, macOS and Windows. Tasks run with that environment on the path. Nothing pretrained ships; every artifact regenerates. GPU training is not bit-reproducible (cuDNN autotuning and bf16 arithmetic), so a rerun with the same seed keeps a different checkpoint and gives slightly different numbers.
 
 ```
-mise run setup    # .venv and dependencies
+mise run setup    # conda environment in .conda/
 mise run train    # WGAN-GP; 6,000 steps take about 11 min on a laptop RTX 5090
 mise run sample   # the TI catalog, into outputs/
 mise run snesim   # one realization per catalog TI, plus the single-TI baseline; about 15 s
