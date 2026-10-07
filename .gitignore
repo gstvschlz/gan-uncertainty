@@ -172,5 +172,4 @@ checkpoints/
 *.pth
 *.npy
 *.out
-!src/snesim/data/strebelle.out
 .venv/

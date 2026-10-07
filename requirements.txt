@@ -1,15 +1,15 @@
 --extra-index-url https://download.pytorch.org/whl/cu128
 torch==2.11.0  # WGAN-GP; the cu128 wheel is needed for Blackwell GPUs and falls back to CPU
-torchvision==0.26.0  # training dataset and image grids
+torchvision==0.26.0  # image grids of training progress
 numpy==2.4.6  # arrays, GSLIB grids
 pandas==3.0.6  # figures: tables of realizations
 Pillow==12.3.0  # GIF frames (ships with matplotlib; pinned because scripts/gifs.py imports it)
 opencv-python==5.0.0.93  # image I/O and resizing
-scikit-image==0.26.0  # sliding windows, SSIM filter
+scikit-image==0.26.0  # sliding windows in the check
+boitata==0.5.0  # SNESIM (Rust, multi-threaded)
 scikit-learn==1.9.1  # MDS in figures
 matplotlib==3.11.2  # figures
 seaborn==0.13.2  # figures: box plots and histograms
 SciencePlots==2.2.2  # figures: journal style
 PyYAML==6.0.3  # parameters.yaml
-tqdm==4.70.1  # progress bars
 tensorboardX==2.6.5  # training logs

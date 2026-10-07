@@ -1,15 +1,15 @@
-output_dir: outputs/windowed_ti/augmented
 training_image: src/snesim/data/strebelle.png
 checkpoint: checkpoints/
 sample_images: outputs/progress
-images_path: outputs/windowed_ti/
 
-num_channels: 1
-latent_dim: 100
-learning_rate: 0.0002
+latent_channels: 64
+crop: 128            # training crop, native TI pixels (no resizing)
 batch_size: 64
-num_workers: 0
-
-n_epochs: 50
-cuda: True
+learning_rate: 0.0001
+betas: [0.0, 0.9]    # Gulrajani et al. (2017)
 n_critic: 5
+gp_weight: 10
+ema_decay: 0.999     # the sampled generator is an EMA of the trained one
+
+steps: 6000          # generator updates; both test runs peaked at 3-6k, then drifted
+eval_every: 500      # score the EMA generator, keep the best checkpoint

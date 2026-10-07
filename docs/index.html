@@ -129,7 +129,7 @@ footer { margin-top: 3rem; padding: 1rem 0 3rem; border-top: 1px solid var(--rul
 <h2 id="summary">Summary</h2>
 <p>Multiple-point statistics (MPS) simulation reproduces curvilinear geology, such as fluvial channels, by copying patterns from a training image (TI). Most workflows draw every realization from a single TI. That TI is one interpretation of the geology, so the realizations leave out the uncertainty about the TI itself and understate spatial uncertainty.</p>
 <p>This project trains a WGAN-GP on Strebelle's 250x250 channel TI. The trained generator samples a catalog of TIs, and each catalog TI conditions one SNESIM realization. Running SNESIM from the single reference TI gives the baseline. Both workflows condition on the same well data.</p>
-<p>The paper concludes that the catalog workflow yields higher uncertainty and variability. The re-run below, made with this repository's code, agrees in direction with a small margin.</p>
+<p>The paper concludes that the catalog workflow yields higher uncertainty and variability. The re-run below, made with this repository's code, agrees in direction, but the margin depends on the checkpoint and stays within sampling noise.</p>
 </div>
 </aside>
 
@@ -185,12 +185,12 @@ footer { margin-top: 3rem; padding: 1rem 0 3rem; border-top: 1px solid var(--rul
     <figcaption><b>Figure 2.</b> A path through the generator's latent space, with the reference TI alongside.</figcaption>
   </figure>
   <figure>
-    <img src="ti-catalog.gif" width="430" height="274" alt="A flipbook of catalog TIs in sand yellow and mud navy, each labelled with its sand proportion." loading="lazy">
+    <img src="ti-catalog.gif" width="430" height="274" alt="A flipbook of catalog TIs with sand in white and mud in black, each labelled with its sand proportion." loading="lazy">
     <figcaption><b>Figure 3.</b> A flipbook of catalog TIs, each labelled with its sand proportion.</figcaption>
   </figure>
   <figure>
-    <img src="training-progression.gif" width="550" height="334" alt="Four generated tiles from fixed latent vectors at each saved epoch, beside the reference TI. Early tiles are noisy; the last ones show channel networks, some still grainy." loading="lazy">
-    <figcaption><b>Figure 4.</b> The same four latent vectors at each saved epoch, beside the reference TI. At epoch 50 some tiles are clean channel networks and others stay grainy.</figcaption>
+    <img src="training-progression.gif" width="550" height="334" alt="Four generated tiles from fixed latent grids every 500 training steps, beside the reference TI. Early tiles are noisy; later ones show channel networks." loading="lazy">
+    <figcaption><b>Figure 4.</b> The same four latent grids every 500 training steps, beside the reference TI.</figcaption>
   </figure>
   <figure>
     <img src="realizations.gif" width="430" height="366" alt="Single-TI baseline realizations on the left and GAN-catalog realizations on the right, with histograms of sand proportion that fill as realizations accumulate." loading="lazy">
@@ -206,20 +206,21 @@ footer { margin-top: 3rem; padding: 1rem 0 3rem; border-top: 1px solid var(--rul
   <thead><tr><th scope="col">Set</th><th scope="col">n</th><th scope="col">Mean</th><th scope="col">Std</th><th scope="col">Min</th><th scope="col">Max</th></tr></thead>
   <tbody>
     <tr><td>Reference TI</td><td>1</td><td>0.2674</td><td></td><td></td><td></td></tr>
-    <tr><td>Catalog TIs</td><td>100</td><td>0.3020</td><td></td><td>0.139</td><td>0.385</td></tr>
-    <tr><td>Realizations, single TI (baseline)</td><td>100</td><td>0.3467</td><td>0.0280</td><td>0.2896</td><td>0.4107</td></tr>
-    <tr><td>Realizations, GAN catalog</td><td>100</td><td>0.3419</td><td>0.0300</td><td>0.2767</td><td>0.4288</td></tr>
+    <tr><td>Catalog TIs</td><td>100</td><td>0.2723</td><td>0.0153</td><td>0.229</td><td>0.321</td></tr>
+    <tr><td>Realizations, single TI (baseline)</td><td>100</td><td>0.2945</td><td>0.0264</td><td>0.2292</td><td>0.3545</td></tr>
+    <tr><td>Realizations, GAN catalog</td><td>100</td><td>0.2890</td><td>0.0314</td><td>0.2044</td><td>0.3644</td></tr>
   </tbody>
 </table>
 </div>
-<p class="note"><b>Table 1.</b> Sand proportion in this repository's re-run (seed 69096, 50 epochs on an RTX 5090, 100 catalog TIs, 100 realizations per workflow). These are not the paper's figures.</p>
-<p>78 of the 100 catalog TIs lie within 0.05 of the reference proportion, and 3 differ by more than 0.10. The catalog realizations spread slightly more than the baseline (std 0.0300 against 0.0280).</p>
-<p>The generator is under-trained relative to the paper. The critic loss had not levelled off at epoch 50, and about 30-40% of sampled tiles are clean channel networks while 20-30% are grainy. Realization means (about 0.34) sit above the reference proportion. Conditioning on well data is expected to shift them; this run did not test that. The two workflows also differ in TI size: the baseline uses the full 250x250 reference, and each catalog TI is 150x150, the window size the generator trains on.</p>
+<p class="note"><b>Table 1.</b> Sand proportion in this repository's re-run (seed 69096, 6,000 generator steps on a laptop RTX 5090, checkpoint of step 5,000, 100 catalog TIs, 100 realizations per workflow). These are not the paper's figures.</p>
+<p>The generator reproduces the reference TI. Catalog TIs hold 0.272 sand on average against 0.267 in the reference, 99 of 100 lie within 0.05 of it, and their x and y indicator variograms (lags 1 to 50) differ from the reference's by 2% on average. Both workflows simulate from 250x250 TIs at the same pixel scale.</p>
+<p>Realizations of both workflows hold more sand than the reference (0.29 against 0.27). The 50 wells hold 44% sand, and SNESIM runs without a servosystem, as in the paper's parameter file.</p>
+<p>The catalog realizations spread more than the baseline: a standard deviation of 0.0314 against 0.0264, a variance ratio of 1.42. An F-test gives a one-sided p of 0.04, but Levene's test gives p = 0.15, and a bootstrap 95% interval for the ratio of standard deviations spans 0.99 to 1.43. The mean per-cell standard deviation is the same in both workflows (0.444 and 0.443). A 3,500-step checkpoint of the same configuration gave equal spreads (0.0267 against 0.0264). The re-run agrees with the paper in direction; with 100 realizations per workflow, the margin stays within sampling noise.</p>
 </section>
 
 <section>
 <h2>Reproduce</h2>
-<p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require; the code falls back to the CPU. On the GPU, 50 epochs take about 2 h; on a CPU, 5 epochs would take an estimated 10 h. SNESIM runs through <code>snesim.exe</code>, so that step needs Windows. Nothing pretrained ships, so every artifact regenerates.</p>
+<p>Install <a href="https://mise.jdx.dev">mise</a>; it provides Python 3.11. The setup step installs torch 2.11 from the CUDA 12.8 wheel index, which RTX 50-series GPUs require (the code falls back to the CPU), and <a href="https://github.com/gstvschlz/boitata">boitata</a>, whose SNESIM runs on Linux, macOS and Windows. On a laptop RTX 5090, training takes about 11 min and SNESIM about 15 s for both workflows. Nothing pretrained ships, so every artifact regenerates. GPU training is not bit-reproducible (cuDNN autotuning and bf16 arithmetic), so a rerun with the same seed keeps a different checkpoint and gives slightly different numbers.</p>
 <pre>mise run setup    # .venv and dependencies
 mise run train    # WGAN-GP
 mise run sample   # the TI catalog
@@ -232,9 +233,14 @@ mise run check    # shape and facies-proportion assertions</pre>
 <section>
 <h2>Differences from the 2022 code</h2>
 <ul>
-  <li>The generator output is binarised at 0 instead of 0.5. For a 5-epoch generator, 0 gives a catalog sand proportion of 0.264 against 0.267 for the reference; 0.5 gave 0.19.</li>
+  <li>The generator is fully convolutional with a spatial latent (a 64-channel grid; Jetchev et al. 2016, Laloy et al. 2018). It trains on random 128x128 crops of the reference TI at its own pixel scale, mirrored at random in x and y, and samples 250x250 TIs from an 8x8 latent grid. The old chain (150x150 window, resize to 128, resize to 256, resize to 250, resize to 150) is gone, and catalog TIs have the reference's size.</li>
+  <li>Training follows Gulrajani et al. (2017): the two-sided gradient penalty <code>(||grad|| - 1)^2</code> (the old code penalised <code>||grad||^2</code>), Adam with lr 1e-4 and betas (0, 0.9), 5 critic steps per generator step. The old loop also leaked generator-loss gradients into the next critic step; that is fixed.</li>
+  <li>The critic sees DiffAugment inputs (Zhao et al. 2020): the same random translation (up to 16 px) and cutout (64x64) applied to real and generated crops. Without it the critic memorised the single training image; its Wasserstein estimate climbed past 270 and the samples degraded after step 6,000.</li>
+  <li>Training runs for 6,000 generator steps in about 11 min; the old code made 1,600 (50 epochs) in about 2 h. Batches are cropped on the GPU (no image files or data loader), with bf16 autocast, TF32 and a smaller network. Nearest-upsampling convolutions replace transposed ones. Test runs reached their best score between steps 3,000 and 6,000 and drifted after.</li>
+  <li>The sampled generator is an exponential moving average (0.999) of the trained weights. Every 500 steps the training scores it on 32 TIs of 250x250 against the reference (sand proportion plus x and y indicator variograms to lag 50) and keeps the best checkpoint as <code>checkpoints/generator.ckpt</code>.</li>
+  <li>The generator output is binarised at 0 (the middle of tanh), not 0.5.</li>
   <li>The SSIM &ge; 0.9 filter in sampling is gone. A dtype bug meant it never filtered, and the SSIM between independent TIs is at most about 0.3.</li>
-  <li>The TI file is <code>strebelle.out</code>, renamed from <code>ti_strebelle.out</code> because <code>snesim.exe</code> rejects file names over 30 characters.</li>
+  <li>SNESIM is <a href="https://github.com/gstvschlz/boitata">boitata</a>'s, in place of GSLIB's <code>snesim.exe</code>, with the settings of the paper's parameter file: 30 conditioning cells, 6 multigrids, at least 10 replicates, no servosystem. On the same TIs and wells it ran the baseline in 1.2 s instead of 574 s and the catalog in 11 s instead of 661 s. Both honour every well datum. boitata's realizations hold about 0.05 less sand than <code>snesim.exe</code>'s (0.295 against 0.347 for the baseline). A well at integer coordinate x goes to cell x - 1, as in <code>snesim.exe</code>.</li>
 </ul>
 </section>
 
@@ -261,7 +267,7 @@ mise run check    # shape and facies-proportion assertions</pre>
 </main>
 </div>
 
-<footer>SNESIM: Strebelle (2002); open implementation: Remy et al. (2009).</footer>
+<footer>SNESIM: Strebelle (2002); implementation: <a href="https://github.com/gstvschlz/boitata">boitata</a>.</footer>
 </div>
 </body>
 </html>

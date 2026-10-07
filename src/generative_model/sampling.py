@@ -1,56 +1,61 @@
-"""Sample the TI catalog: latent vectors -> WGAN-GP generator -> binary TIs."""
+"""Sample the TI catalog: latent grids -> WGAN-GP generator -> binary 250x250 TIs."""
 
 import argparse
+import math
 import os
 
-import cv2
 import numpy as np
 import torch
-import torch.nn.functional as F
 
-from arch.models import GeneratorModel
+from arch.models import SCALE, GeneratorModel
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+TI_SIZE = 250  # the reference TI, so both workflows simulate from same-size TIs
 
 
-def load_generator(model_path: str, latent_size: int) -> torch.nn.Module:
-    """Load the Generator weights from a training checkpoint (DataParallel prefix removed)."""
-    state = torch.load(model_path, map_location=DEVICE)["Generator"]
-    model = GeneratorModel(latent_size).to(DEVICE)
-    model.load_state_dict({k.replace("module.", ""): v for k, v in state.items()})
+def load_generator(model_path: str) -> GeneratorModel:
+    """Load the EMA generator weights from a training checkpoint."""
+    ckpt = torch.load(model_path, map_location=DEVICE)
+    model = GeneratorModel(ckpt["z_ch"]).to(DEVICE)
+    model.load_state_dict(ckpt["Generator"])
     return model.eval()
 
 
-def create_ti_files(samples: np.ndarray, output_directory: str) -> None:
-    """Write each TI as a 150x150 GSLIB file (`ti_<idx>.out`) for SNESIM."""
-    os.makedirs(output_directory, exist_ok=True)
-    for idx, im in enumerate(samples):
-        im = cv2.resize(im, (150, 150), interpolation=cv2.INTER_NEAREST)
-        np.savetxt(
-            f"{output_directory}/ti_{idx}.out",
-            im.reshape(-1),
-            header="150 150 1\n1\nfacies",
-            fmt="%1d",
-            comments="",
-        )
+def latents(n: int, z_ch: int, size: int = TI_SIZE) -> torch.Tensor:
+    """n latent grids large enough for a size x size TI."""
+    cells = math.ceil(size / SCALE)
+    return torch.randn(n, z_ch, cells, cells, device=DEVICE)
+
+
+@torch.no_grad()
+def generate(generator: GeneratorModel, z: torch.Tensor, size: int = TI_SIZE) -> np.ndarray:
+    """Generator output, centre-cropped to size x size at native scale, binarized at 0:
+    the tanh output is in [-1, 1] and sand (1) is the positive half."""
+    out = torch.cat([generator(b) for b in z.split(10)])[:, 0]
+    o = (out.shape[-1] - size) // 2
+    return (out[:, o : o + size, o : o + size] > 0).cpu().numpy().astype(np.uint8)
+
+
+def variogram(tis: np.ndarray, lags: int = 50) -> np.ndarray:
+    """Mean indicator variogram of binary images along x and y, lags 1..lags: (2, lags).
+    Lag 1 measures grain; the sill is p(1-p); the shape carries channel width and length."""
+    t = tis.astype(np.float32)
+    hs = range(1, lags + 1)
+    return np.array(
+        [
+            [0.5 * np.mean((t[..., h:] - t[..., :-h]) ** 2) for h in hs],
+            [0.5 * np.mean((t[..., h:, :] - t[..., :-h, :]) ** 2) for h in hs],
+        ]
+    )
 
 
 def main(args: argparse.Namespace) -> None:
     torch.manual_seed(args.seed)
-    generator = load_generator(args.model_path, args.latent_size)
-
-    with torch.no_grad():
-        z = torch.randn(args.num_samples, args.latent_size, device=DEVICE)
-        images = torch.cat([generator(b) for b in z.split(10)])
-    images = F.interpolate(images, size=(250, 250)).squeeze(1).cpu().numpy()
-
-    # Generator output is tanh in [-1, 1]: sand (1) is the positive half, as in the
-    # training image where sand is white.
-    catalog = (images > 0).astype(np.uint8)
+    generator = load_generator(args.model_path)
+    catalog = generate(generator, latents(args.num_samples, generator.z_ch))
 
     os.makedirs(os.path.dirname(args.output_file) or ".", exist_ok=True)
     np.save(args.output_file, catalog)
-    create_ti_files(catalog, args.output_dir)
     print(
         f"Saved {len(catalog)} TIs {catalog.shape} to {args.output_file} "
         f"(sand proportion {catalog.mean():.4f})"
@@ -60,9 +65,7 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sample the TI catalog")
     parser.add_argument("--num_samples", type=int, default=100)
-    parser.add_argument("--latent_size", type=int, default=100)
-    parser.add_argument("--model_path", default="checkpoints/Epoch.ckpt")
+    parser.add_argument("--model_path", default="checkpoints/generator.ckpt")
     parser.add_argument("--output_file", default="outputs/catalog.npy")
-    parser.add_argument("--output_dir", default="outputs/catalog")
     parser.add_argument("--seed", type=int, default=69096)
     main(parser.parse_args())
