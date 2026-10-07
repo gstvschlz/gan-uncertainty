@@ -5,19 +5,19 @@ channels:
   - conda-forge
 dependencies:
   - python=3.11
-  - pytorch=2.13.0  # WGAN-GP
-  - torchvision=0.28.0  # image grids of training progress
+  - pytorch=2.13.0
+  - torchvision=0.28.0
   - numpy=2.4.6
-  - pandas=3.0.6  # figures: tables of realizations
-  - pillow=12.3.0  # GIF frames
-  - opencv=5.0.0  # image I/O and resizing
-  - scikit-image=0.26.0  # sliding windows in the check
-  - scikit-learn=1.9.1  # MDS in figures
-  - matplotlib-base=3.11.2  # figures
-  - seaborn=0.13.2  # figures: box plots and histograms
-  - scienceplots=2.2.2  # figures: journal style
-  - pyyaml=6.0.3  # parameters.yaml
-  - tensorboardx=2.6.2.2  # training logs
+  - pandas=3.0.6
+  - pillow=12.3.0
+  - opencv=5.0.0
+  - scikit-image=0.26.0
+  - scikit-learn=1.9.1
+  - matplotlib-base=3.11.2
+  - seaborn=0.13.2
+  - scienceplots=2.2.2
+  - pyyaml=6.0.3
+  - tensorboardx=2.6.2.2
   - pip
   - pip:
-      - boitata==0.5.0  # SNESIM (Rust, multi-threaded); not on conda-forge yet
+      - boitata==0.5.0
